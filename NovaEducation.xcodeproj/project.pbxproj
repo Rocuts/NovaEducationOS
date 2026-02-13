@@ -6,13 +6,30 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C73BDFFD2F21F71100405EC9 /* SwiftMath in Frameworks */ = {isa = PBXBuildFile; productRef = C73BDFFC2F21F71100405EC9 /* SwiftMath */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		C769836D2F2124A1007FFCE3 /* NovaEducation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NovaEducation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		C73BDF342F21DB5500405EC9 /* Exceptions for "NovaEducation" folder in "NovaEducation" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C769836C2F2124A1007FFCE3 /* NovaEducation */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C769836F2F2124A1007FFCE3 /* NovaEducation */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C73BDF342F21DB5500405EC9 /* Exceptions for "NovaEducation" folder in "NovaEducation" target */,
+			);
 			path = NovaEducation;
 			sourceTree = "<group>";
 		};
@@ -23,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C73BDFFD2F21F71100405EC9 /* SwiftMath in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +83,7 @@
 			);
 			name = NovaEducation;
 			packageProductDependencies = (
+				C73BDFFC2F21F71100405EC9 /* SwiftMath */,
 			);
 			productName = NovaEducation;
 			productReference = C769836D2F2124A1007FFCE3 /* NovaEducation.app */;
@@ -94,6 +113,9 @@
 			);
 			mainGroup = C76983642F2124A1007FFCE3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C73BDFFB2F21F71100405EC9 /* XCRemoteSwiftPackageReference "SwiftMath" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C769836E2F2124A1007FFCE3 /* Products */;
 			projectDirPath = "";
@@ -255,7 +277,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = F5BG2A9DQK;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NovaEducation/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -287,7 +310,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = F5BG2A9DQK;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NovaEducation/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -332,6 +356,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C73BDFFB2F21F71100405EC9 /* XCRemoteSwiftPackageReference "SwiftMath" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mgriebling/SwiftMath.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.7.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C73BDFFC2F21F71100405EC9 /* SwiftMath */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C73BDFFB2F21F71100405EC9 /* XCRemoteSwiftPackageReference "SwiftMath" */;
+			productName = SwiftMath;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C76983652F2124A1007FFCE3 /* Project object */;
 }
