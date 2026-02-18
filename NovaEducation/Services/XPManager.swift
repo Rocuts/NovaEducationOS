@@ -17,7 +17,10 @@ final class XPManager {
     var didLevelUp: Bool = false
 
     /// Nuevo nivel si hubo level up
-    var newLevel: Int = 0
+    var newLevel: Int = 1
+
+    /// Nivel anterior antes del último level up
+    var previousLevel: Int = 0
 
     /// Multiplicador actual
     var currentMultiplier: Double = 1.0
@@ -82,6 +85,7 @@ final class XPManager {
         lastXPGained = finalXP
         didLevelUp = leveledUp
         if leveledUp {
+            self.previousLevel = previousLevel
             newLevel = settings.currentLevel
         }
 
@@ -313,5 +317,6 @@ final class XPManager {
         lastXPGained = 0
         didLevelUp = false
         newLevel = 0
+        previousLevel = 0
     }
 }

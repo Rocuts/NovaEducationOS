@@ -3,6 +3,8 @@ import Foundation
 
 @Model
 final class DailyActivity {
+    #Index<DailyActivity>([\.date])
+
     // We store the date normalized to the start of the day to ensure uniqueness per day
     @Attribute(.unique) var date: Date
     var wasActive: Bool

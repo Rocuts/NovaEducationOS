@@ -4,6 +4,8 @@ import SwiftData
 /// Represents a piece of knowledge or information about the student that the AI remembers
 @Model
 class StudentKnowledge {
+
+
     var id: UUID
     var content: String
     var category: KnowledgeCategory

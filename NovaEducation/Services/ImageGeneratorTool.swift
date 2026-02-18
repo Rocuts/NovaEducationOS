@@ -1,19 +1,21 @@
 import Foundation
 import FoundationModels
 import ImagePlayground
+import os
 import UIKit
 
 /// Tool that allows the Foundation Model to generate educational images
 /// The model will autonomously decide when to call this tool based on the conversation context
 final class ImageGeneratorTool: Tool, @unchecked Sendable {
+    private let logger = Logger(subsystem: "com.nova.education", category: "ImageGenerator")
+
     /// Tool identifier - must be short and without spaces
     let name = "generateEducationalImage"
+    let includesSchemaInInstructions = false
 
     typealias Output = String
 
-    /// Description that helps the model understand when to use this tool
-    /// Apple recommends: "One sentence maximum - longer descriptions add tokens and increase latency"
-    let description = "Generates an educational illustration of animals, plants, places, landmarks, planets, or anatomy to help visualize physical concepts."
+    let description = "Generates an educational illustration for visual concepts like animals, plants, places, or planets."
 
     /// Categories that justify image generation - the model MUST choose one
     @Generable
@@ -28,30 +30,29 @@ final class ImageGeneratorTool: Tool, @unchecked Sendable {
         case art         // Artworks, sculptures, artistic styles
     }
 
-    /// Arguments the model will provide when calling this tool
     @Generable
     struct Arguments {
-        @Guide(description: "Category of visual content being illustrated")
+        @Guide(description: "Content category")
         let category: ImageCategory
 
-        @Guide(description: "Image description in English only")
+        @Guide(description: "English prompt for the image")
         let imagePrompt: String
 
-        @Guide(description: "Brief reason in Spanish (max 8 words)")
+        @Guide(description: "Reason in Spanish")
         let reasonForImage: String
     }
 
-    /// Callback to notify when an image is being generated
-    var onGenerationStarted: ((String) -> Void)?
+    /// Set once from @MainActor before any call() invocation
+    nonisolated(unsafe) var onGenerationStarted: ((String) -> Void)?
 
-    /// Callback to deliver the generated image URL
-    var onImageGenerated: ((URL) -> Void)?
+    /// Set once from @MainActor before any call() invocation
+    nonisolated(unsafe) var onImageGenerated: ((URL) -> Void)?
 
-    /// Callback for generation errors
-    var onGenerationFailed: ((String) -> Void)?
+    /// Set once from @MainActor before any call() invocation
+    nonisolated(unsafe) var onGenerationFailed: ((String) -> Void)?
 
     /// The ImagePlayground creator instance
-    private var imageCreator: ImageCreator?
+    nonisolated(unsafe) private var imageCreator: ImageCreator?
 
     /// Initialize the tool
     init() {
@@ -64,31 +65,28 @@ final class ImageGeneratorTool: Tool, @unchecked Sendable {
             if imageCreator == nil {
                 do {
                     imageCreator = try await ImageCreator()
-                    print("✅ ImageCreator initialized successfully")
+                    logger.info("ImageCreator initialized successfully")
                 } catch {
-                    print("❌ Failed to initialize ImageCreator: \(error.localizedDescription)")
+                    logger.error("Failed to initialize ImageCreator")
                 }
             }
         }
     }
 
-    /// Whether image generation is available on this device
+    /// Whether image generation is available on this device.
+    /// Returns true if the OS supports ImagePlayground — the actual ImageCreator
+    /// is initialized lazily inside call() so this check must NOT depend on it.
     var isAvailable: Bool {
         if #available(iOS 26, *) {
-             if let creator = imageCreator {
-                return !creator.availableStyles.isEmpty
-            }
-            // If we are on iOS 26, we assume it SHOULD be available.
-            // Returning true encourages the service to try using it.
-            return true 
+            return true
         }
         return false
     }
 
     /// Called by the Foundation Model when it decides to generate an image
     func call(arguments: Arguments) async throws -> String {
-        print("🖼️ ImageGeneratorTool called - Category: \(arguments.category.rawValue)")
-        print("🖼️ Prompt: \(arguments.imagePrompt)")
+        logger.debug("ImageGeneratorTool called")
+        logger.debug("Image prompt: \(arguments.imagePrompt, privacy: .private)")
 
         // Notify that generation is starting
         await MainActor.run {
@@ -100,7 +98,7 @@ final class ImageGeneratorTool: Tool, @unchecked Sendable {
         let spanishIndicators = [" el ", " la ", " los ", " las ", " un ", " una ", " para ", " con ", " sobre ", " mostrar "]
         let lowerPrompt = arguments.imagePrompt.lowercased()
         let isLikelySpanish = spanishIndicators.contains { lowerPrompt.contains($0) } || lowerPrompt.hasPrefix("un ") || lowerPrompt.hasPrefix("una ")
-        
+
         if isLikelySpanish {
              let errorMsg = "The imagePrompt MUST be in English. You provided: '\(arguments.imagePrompt)'. Please retry using the English translation."
              await MainActor.run {
@@ -117,35 +115,53 @@ final class ImageGeneratorTool: Tool, @unchecked Sendable {
             return "No se pudo generar la imagen: \(error)"
         }
 
-        // Initialize creator if needed
+        // Reuse prepared creator or initialize if needed (synchronize via MainActor)
         let creator: ImageCreator
-        do {
-            creator = try await ImageCreator()
-        } catch {
-            let errorMsg = "ImagePlayground no disponible"
-            await MainActor.run {
-                onGenerationFailed?(errorMsg)
+        let existingCreator = await MainActor.run { self.imageCreator }
+        if let existing = existingCreator {
+            creator = existing
+        } else {
+            do {
+                let newCreator = try await ImageCreator()
+                await MainActor.run { self.imageCreator = newCreator }
+                creator = newCreator
+            } catch {
+                let errorMsg = "ImagePlayground no disponible"
+                await MainActor.run {
+                    onGenerationFailed?(errorMsg)
+                }
+                return "No se pudo generar la imagen: \(errorMsg)"
             }
-            return "No se pudo generar la imagen: \(errorMsg)"
         }
 
         // Generate the image
         do {
             // "NO TEXT" at the start is often more effective for attention mechanisms
-            let educationalPrompt = "NO TEXT, NO LABELS. Just a clear educational illustration: \(arguments.imagePrompt). Visual only."
+            // Force 2D styles by prompt engineering + style selection
+            let educationalPrompt = "NO TEXT, NO LABELS. FLAT 2D ILLUSTRATION. Just a clear educational illustration: \(arguments.imagePrompt). Visual only."
 
             let concepts: [ImagePlaygroundConcept] = [
                 .text(educationalPrompt)
             ]
 
             let availableStyles = creator.availableStyles
-            guard let style = availableStyles.first else {
-                return "Error: No se encontró un estilo de imagen válido"
+            
+            // PRIORITY: Illustration > Sketch > Animation (Avoid 3D/Animation if possible to prevent "I" artifact)
+            let selectedStyle: ImagePlaygroundStyle
+            if let illustration = availableStyles.first(where: { $0 == .illustration }) {
+                selectedStyle = illustration
+            } else if let sketch = availableStyles.first(where: { $0 == .sketch }) {
+                selectedStyle = sketch
+            } else if let first = availableStyles.first {
+                selectedStyle = first
+                logger.warning("Preferred styles (Illustration/Sketch) not available, using fallback")
+            } else {
+                 return "Error: No se encontró un estilo de imagen válido"
             }
 
             let imageStream = creator.images(
                 for: concepts,
-                style: style,
+                style: selectedStyle,
                 limit: 1
             )
 
@@ -157,7 +173,7 @@ final class ImageGeneratorTool: Tool, @unchecked Sendable {
                     onImageGenerated?(url)
                 }
 
-                return "Imagen generada exitosamente: \(arguments.reasonForImage)"
+                return "Image created."
             }
 
             await MainActor.run {

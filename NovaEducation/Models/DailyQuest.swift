@@ -5,6 +5,8 @@ import SwiftUI
 /// Representa una misión diaria generada por la IA
 @Model
 final class DailyQuest {
+    #Index<DailyQuest>([\.createdAt], [\.isCompleted], [\.expiresAt])
+
     var id: UUID
     var typeRaw: String           // Almacenamiento para QuestType
     var difficultyRaw: String     // Almacenamiento para QuestDifficulty
@@ -52,8 +54,8 @@ final class DailyQuest {
         self.createdAt = Date()
         self.completedAt = nil
 
-        // Expira a medianoche del día actual
-        self.expiresAt = Calendar.current.startOfDay(for: Date()).addingTimeInterval(24 * 60 * 60)
+        // Expira a medianoche del día siguiente (usando Calendar para manejar DST)
+        self.expiresAt = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date().addingTimeInterval(86400)
     }
 
     /// Marca la misión como completada

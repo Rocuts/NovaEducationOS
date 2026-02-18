@@ -8,6 +8,8 @@ enum MessageRole: String, Codable {
 
 @Model
 class ChatMessage {
+    #Index<ChatMessage>([\.subjectId, \.timestamp])
+
     var id: UUID
     var role: MessageRole
     var content: String
@@ -34,17 +36,30 @@ class ChatMessage {
         }
     }
 
+    /// Type of interactive attachment (e.g., "geometry_3d", "particle_effect")
+    var attachmentType: String?
+    
+    /// JSON string data for the attachment
+    var attachmentData: String?
+
     /// Whether this message has an associated image
     var hasImage: Bool {
         imageURLString != nil
     }
+    
+    /// Whether this message has an interactive attachment
+    var hasAttachment: Bool {
+        attachmentType != nil
+    }
 
-    init(role: MessageRole, content: String, subjectId: String, imageURL: URL? = nil) {
+    init(role: MessageRole, content: String, subjectId: String, imageURL: URL? = nil, attachmentType: String? = nil, attachmentData: String? = nil) {
         self.id = UUID()
         self.role = role
         self.content = content
         self.timestamp = Date()
         self.subjectId = subjectId
-        self.imageURLString = imageURL?.absoluteString
+        self.imageURLString = imageURL?.lastPathComponent
+        self.attachmentType = attachmentType
+        self.attachmentData = attachmentData
     }
 }

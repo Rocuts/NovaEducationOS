@@ -1,5 +1,6 @@
 import Foundation
 import ImagePlayground
+import os
 import SwiftUI
 
 /// State of image generation - defined at module level for accessibility
@@ -44,6 +45,8 @@ enum ImageGenerationState: Equatable {
 @Observable
 @MainActor
 final class ImageGeneratorService {
+    private let logger = Logger(subsystem: "com.nova.education", category: "ImageGeneratorService")
+
     /// Type alias for backward compatibility
     typealias GenerationState = ImageGenerationState
 
@@ -77,7 +80,7 @@ final class ImageGeneratorService {
             do {
                 imageCreator = try await ImageCreator()
             } catch {
-                print("ImageGeneratorService: Failed to initialize ImageCreator - \(error.localizedDescription)")
+                logger.error("Failed to initialize ImageCreator")
             }
         }
     }
@@ -105,19 +108,27 @@ final class ImageGeneratorService {
         }
 
         // Select style internally
-        // Note: We use the first available style
+        // PRIORITY: Illustration > Sketch > Animation (Avoid 3D/Animation if possible)
         let styles = creator.availableStyles
         
-        guard let selectedStyle = styles.first else {
-            state = .failed(error: "Estilo de imagen no disponible")
-            return nil
+        let selectedStyle: ImagePlaygroundStyle
+        if let illustration = styles.first(where: { $0 == .illustration }) {
+            selectedStyle = illustration
+        } else if let sketch = styles.first(where: { $0 == .sketch }) {
+            selectedStyle = sketch
+        } else if let first = styles.first {
+            selectedStyle = first
+        } else {
+             state = .failed(error: "Estilo de imagen no disponible")
+             return nil
         }
 
         state = .generating(prompt: prompt)
 
         do {
             // Create educational-focused concept
-            let educationalPrompt = "Educational illustration for students: \(prompt). Clear, simple, and easy to understand."
+            // Force 2D styles by prompt engineering + style selection
+            let educationalPrompt = "NO TEXT, NO LABELS. FLAT 2D ILLUSTRATION. Educational illustration for students: \(prompt). Clear, simple, and easy to understand."
 
             let concepts: [ImagePlaygroundConcept] = [
                 .text(educationalPrompt)
@@ -175,7 +186,7 @@ final class ImageGeneratorService {
     }
 
     /// Cleans up old generated images (optional maintenance)
-    func cleanupOldImages(olderThan days: Int = 7) {
+    static func cleanupOldImages(olderThan days: Int = 7) {
         let directory = URL.documentsDirectory.appending(path: "GeneratedImages")
 
         guard let files = try? FileManager.default.contentsOfDirectory(

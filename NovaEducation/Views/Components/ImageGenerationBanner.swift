@@ -47,9 +47,9 @@ struct ImageGenerationBanner: View {
 
                 // Progress indicator (only when processing)
                 if case .analyzing = state {
-                    SwiftUI.ProgressView().tint(subjectColor)
+                    ProgressView().tint(subjectColor)
                 } else if case .generating = state {
-                    SwiftUI.ProgressView().tint(subjectColor)
+                    ProgressView().tint(subjectColor)
                 }
             }
             .padding(.horizontal, 16)
@@ -57,10 +57,34 @@ struct ImageGenerationBanner: View {
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 16)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityStateLabel)
+            .onChange(of: state) { _, newState in
+                if case .generating = newState {
+                    AccessibilityNotification.Announcement("Generando imagen educativa").post()
+                } else if case .completed = newState {
+                    AccessibilityNotification.Announcement("Imagen generada exitosamente").post()
+                }
+            }
             .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity),
                 removal: .opacity
             ))
+        }
+    }
+
+    private var accessibilityStateLabel: String {
+        switch state {
+        case .analyzing:
+            return "Analizando contenido para generar imagen"
+        case .generating:
+            return "Generando imagen educativa"
+        case .completed:
+            return "Imagen generada exitosamente"
+        case .failed(let error):
+            return "Error al generar imagen: \(error)"
+        default:
+            return ""
         }
     }
 
@@ -96,7 +120,7 @@ struct ImageGenerationIndicator: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                SwiftUI.ProgressView()
+                ProgressView()
                     .scaleEffect(0.7)
             }
             .padding(.horizontal, 12)

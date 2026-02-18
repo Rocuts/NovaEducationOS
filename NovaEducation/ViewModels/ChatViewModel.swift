@@ -8,8 +8,9 @@ class ChatViewModel {
     var subject: Subject
     var isGenerating: Bool = false
 
-    private var modelService = FoundationModelService()
+    private let modelService = FoundationModelService.shared
     private var currentTask: Task<Void, Never>?
+    private var xpToastDismissTask: Task<Void, Never>?
 
     /// Student profile for adaptive prompts
     private let studentName: String
@@ -27,13 +28,25 @@ class ChatViewModel {
     var didLevelUp: Bool = false
 
     /// Nuevo nivel si hubo level up
-    var newLevel: Int = 0
+    var newLevel: Int = 1
+
+    /// Nivel anterior antes del level up
+    var previousLevel: Int = 0
 
     /// Nuevo título si hubo level up
     var newTitle: String = ""
 
-    /// Si debemos mostrar toast de XP
+    /// Si debemos mostrar toast de XP (deprecated - ahora usa IslandNotification)
     var showXPToast: Bool = false
+
+    /// Si debemos mostrar explosion de particulas para XP grandes o level up
+    var showParticleExplosion: Bool = false
+
+    /// Error message para mostrar al usuario (nil = sin error)
+    var errorMessage: String? = nil
+
+    /// Sugerencia de recuperación para el error actual
+    var errorRecoverySuggestion: String? = nil
 
     /// Si debemos mostrar celebración de level up
     var showLevelUpCelebration: Bool = false
@@ -64,6 +77,16 @@ class ChatViewModel {
         let trimmed = currentInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
+        // Limpiar error previo al enviar nuevo mensaje
+        dismissError()
+
+        // Validar seguridad del contenido antes de enviar a AI
+        let safetyResult = ContentSafetyService.validate(trimmed)
+        if case .unsafe(let reason) = safetyResult {
+            self.errorMessage = reason
+            return
+        }
+
         let userMsg = ChatMessage(role: .user, content: trimmed, subjectId: subject.id)
         context.insert(userMsg)
 
@@ -78,21 +101,17 @@ class ChatViewModel {
 
         isGenerating = true
 
+        // Cancel previous generation to prevent race conditions
+        currentTask?.cancel()
         currentTask = Task {
-            var fullResponse = ""
             var responseSuccessful = false
 
             do {
                 let stream = modelService.streamResponse(prompt: userMessage.content, history: history)
 
                 for try await delta in stream {
-                    fullResponse += delta
+                    guard !Task.isCancelled else { break }
                     assistantMsg.content += delta
-                }
-
-                // Ensure final content is set
-                if assistantMsg.content.isEmpty {
-                    assistantMsg.content = fullResponse
                 }
 
                 // Check if an image was generated via Tool Calling
@@ -100,6 +119,12 @@ class ChatViewModel {
                 if let imageURL = modelService.generatedImageURL {
                     assistantMsg.imageURL = imageURL
                     modelService.resetImageState()
+                }
+                
+                // Check if an interactive attachment was generated via Tool Calling
+                if let attachment = modelService.generatedAttachment {
+                    assistantMsg.attachmentType = attachment.type
+                    assistantMsg.attachmentData = attachment.data
                 }
 
                 // Cleanup common placeholder text unconditionally
@@ -131,9 +156,14 @@ class ChatViewModel {
 
             } catch {
                 if assistantMsg.content.isEmpty {
-                    assistantMsg.content = "Lo siento, hubo un error al generar la respuesta. Por favor intenta de nuevo.\n\nError: \(error.localizedDescription)"
+                    // Eliminar mensaje vacío y mostrar error como estado separado
+                    context.delete(assistantMsg)
+                    let novaError = error as? NovaError
+                    self.errorMessage = novaError?.errorDescription ?? "Lo siento, hubo un error al generar la respuesta. Por favor intenta de nuevo."
+                    self.errorRecoverySuggestion = novaError?.recoverySuggestion
                 } else {
-                    assistantMsg.content += "\n\n[Error: \(error.localizedDescription)]"
+                    // Respuesta parcial recibida — no agregar error crudo al contenido
+                    self.errorMessage = "La respuesta se interrumpió. Puedes intentar de nuevo."
                 }
             }
 
@@ -173,19 +203,29 @@ class ChatViewModel {
         didLevelUp = result.leveledUp
 
         if result.leveledUp {
-            newLevel = XPManager.shared.newLevel
+            let level = XPManager.shared.newLevel
+            guard level > 0 else { return }
+            previousLevel = XPManager.shared.previousLevel
+            newLevel = level
             newTitle = PlayerLevel.title(forLevel: newLevel)
             showLevelUpCelebration = true
         }
 
-        // Mostrar toast de XP
+        // Mostrar notificación de XP via Island Notification
         if result.xpGained > 0 {
-            showXPToast = true
+            IslandNotificationManager.shared.show(
+                .xpGain(amount: lastXPGained, multiplier: lastMultiplier)
+            )
 
-            // Auto-hide después de 2 segundos
-            Task {
-                try? await Task.sleep(for: .seconds(2.5))
-                showXPToast = false
+            // Mostrar explosion de particulas para XP grandes o level up
+            if lastXPGained >= 15 || result.leveledUp {
+                showParticleExplosion = true
+                xpToastDismissTask?.cancel()
+                xpToastDismissTask = Task {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    guard !Task.isCancelled else { return }
+                    showParticleExplosion = false
+                }
             }
         }
     }
@@ -194,12 +234,19 @@ class ChatViewModel {
     func dismissLevelUpCelebration() {
         showLevelUpCelebration = false
         didLevelUp = false
+        previousLevel = 0
         XPManager.shared.resetAnimationState()
     }
 
     /// Resetea el toast de XP
     func dismissXPToast() {
         showXPToast = false
+    }
+
+    /// Limpia el estado de error
+    func dismissError() {
+        errorMessage = nil
+        errorRecoverySuggestion = nil
     }
 
     func stopGenerating() {

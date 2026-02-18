@@ -105,14 +105,17 @@ struct MarkdownTextView: View {
         case mathBlock(String)
     }
 
+    // Cached regex - compiled once instead of every render
+    private static let latexRegex: NSRegularExpression? = {
+        let pattern = #"(\$\$[\s\S]+?\$\$|\$[^\$\n]+?\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\))"#
+        return try? NSRegularExpression(pattern: pattern, options: [])
+    }()
+
     private func parseContentBlocks() -> [ContentBlock] {
         var blocks: [ContentBlock] = []
         let remaining = content
 
-        // Pattern to match LaTeX: $$...$$, $...$, \[...\], \(...\)
-        let pattern = #"(\$\$[\s\S]+?\$\$|\$[^\$\n]+?\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\))"#
-
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+        guard let regex = Self.latexRegex else {
             return [.text(content)]
         }
 
@@ -210,6 +213,8 @@ private struct MathUIViewWrapper: UIViewRepresentable {
     var textColor: UIColor
     var displayStyle: Bool
 
+    private static let fontManager = MTFontManager()
+
     func makeUIView(context: Context) -> MTMathUILabel {
         let label = MTMathUILabel()
         label.backgroundColor = .clear
@@ -235,7 +240,7 @@ private struct MathUIViewWrapper: UIViewRepresentable {
         label.labelMode = displayStyle ? .display : .text
 
         // Use Latin Modern Math font (default, looks great)
-        if let font = MTFontManager().font(withName: "latinmodern-math", size: fontSize) {
+        if let font = Self.fontManager.font(withName: "latinmodern-math", size: fontSize) {
             label.font = font
         }
     }

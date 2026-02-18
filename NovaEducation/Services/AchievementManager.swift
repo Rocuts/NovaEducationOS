@@ -26,13 +26,13 @@ final class AchievementManager {
         guard let settings = fetchSettings(context: context) else { return }
 
         let sessions = fetchSessions(context: context)
-        let messages = fetchMessages(context: context)
+        let messageCount = fetchMessageCount(context: context)
         let knowledge = fetchKnowledge(context: context)
         let quizzes = fetchQuizzes(context: context)
         let dailyActivities = fetchDailyActivities(context: context)
+        let completedQuestCount = fetchCompletedQuestCount(context: context)
 
-        // Verificar cada categoría de logros
-        checkLearningAchievements(settings: settings, messages: messages, quizzes: quizzes, context: context)
+        checkLearningAchievements(settings: settings, messageCount: messageCount, quizzes: quizzes, completedQuestCount: completedQuestCount, context: context)
         checkStreakAchievements(settings: settings, dailyActivities: dailyActivities, context: context)
         checkExplorationAchievements(sessions: sessions, context: context)
         checkScheduleAchievements(sessions: sessions, dailyActivities: dailyActivities, context: context)
@@ -44,11 +44,11 @@ final class AchievementManager {
 
     private func checkLearningAchievements(
         settings: UserSettings,
-        messages: [ChatMessage],
+        messageCount: Int,
         quizzes: [QuizQuestion],
+        completedQuestCount: Int,
         context: ModelContext
     ) {
-        let messageCount = messages.count
         let perfectQuizCount = settings.perfectQuizzes
         let plansCompleted = settings.completedPlans
 
@@ -63,8 +63,7 @@ final class AchievementManager {
         updateProgress(.curious1000, current: messageCount, context: context)
 
         // Quiz achievements
-        let completedQuizzes = quizzes.filter { $0.wasAnsweredCorrectly != nil }
-        if !completedQuizzes.isEmpty {
+        if !quizzes.isEmpty {
             unlock(.quizFirst, progress: 1, context: context)
         }
 
@@ -75,6 +74,11 @@ final class AchievementManager {
         if plansCompleted >= 1 {
             unlock(.planCompleted, progress: 1, context: context)
         }
+
+        // Quest completion achievements
+        updateProgress(.questComplete3, current: completedQuestCount, context: context)
+        updateProgress(.questComplete10, current: completedQuestCount, context: context)
+        updateProgress(.questComplete50, current: completedQuestCount, context: context)
     }
 
     // MARK: - Streak Achievements
@@ -118,6 +122,13 @@ final class AchievementManager {
         updateProgress(.deepDive, current: maxSessionMinutes, context: context)
         updateProgress(.marathon, current: maxSessionMinutes, context: context)
         updateProgress(.ultraMarathon, current: maxSessionMinutes, context: context)
+
+        // Multi-subject day: 3+ different subjects studied today
+        let calendar = Calendar.current
+        let todayStart = calendar.startOfDay(for: Date())
+        let todaySessions = sessions.filter { $0.startTime >= todayStart }
+        let todaySubjects = Set(todaySessions.map { $0.subjectId })
+        updateProgress(.multiSubjectDay, current: todaySubjects.count, context: context)
     }
 
     // MARK: - Schedule Achievements
@@ -206,11 +217,22 @@ final class AchievementManager {
         let subjectsWithMastery = conceptsBySubject.filter { $0.value.count >= 5 }.count
         updateProgress(.polymath, current: subjectsWithMastery, context: context)
 
-        // Perfect score (100% on a 10-question quiz)
-        // This would need quiz session tracking - simplified check
-        let perfectQuizzes = quizzes.filter { $0.wasAnsweredCorrectly == true }
-        if perfectQuizzes.count >= 10 {
-            // Check if 10 consecutive correct answers
+        // Perfect score (10 consecutive correct answers in a single session)
+        let sortedQuizzes = quizzes.sorted { $0.createdAt < $1.createdAt }
+        var consecutiveCorrect = 0
+        var hasPerfectRun = false
+        for quiz in sortedQuizzes {
+            if quiz.wasAnsweredCorrectly == true {
+                consecutiveCorrect += 1
+                if consecutiveCorrect >= 10 {
+                    hasPerfectRun = true
+                    break
+                }
+            } else {
+                consecutiveCorrect = 0
+            }
+        }
+        if hasPerfectRun {
             unlock(.perfectScore, progress: 1, context: context)
         }
 
@@ -225,7 +247,11 @@ final class AchievementManager {
         context: ModelContext
     ) {
         let level = settings.currentLevel
+        let totalXP = settings.totalXP
 
+        if level >= 3 {
+            unlock(.level3, progress: 3, context: context)
+        }
         if level >= 5 {
             unlock(.level5, progress: 5, context: context)
         }
@@ -235,6 +261,11 @@ final class AchievementManager {
         if level >= 20 {
             unlock(.level20, progress: 20, context: context)
         }
+
+        // XP collection achievements
+        updateProgress(.xpCollector500, current: totalXP, context: context)
+        updateProgress(.xpCollector2000, current: totalXP, context: context)
+        updateProgress(.xpCollector10000, current: totalXP, context: context)
     }
 
     // MARK: - Unlock & Progress Methods
@@ -301,8 +332,7 @@ final class AchievementManager {
         hasNewUnlock = true
 
         // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        Nova.Haptics.success()
     }
 
     /// Resetea el estado de animación (llamar después de mostrar)
@@ -335,13 +365,12 @@ final class AchievementManager {
     // MARK: - Helper Methods
 
     private func calculateCurrentStreak(activities: [DailyActivity]) -> Int {
+        // Activities are already sorted by date descending from fetchDailyActivities
         let calendar = Calendar.current
         var streak = 0
         var expectedDate = calendar.startOfDay(for: Date())
 
-        let sortedActivities = activities.sorted { $0.date > $1.date }
-
-        for activity in sortedActivities {
+        for activity in activities {
             let activityDate = calendar.startOfDay(for: activity.date)
 
             if activityDate == expectedDate && activity.wasActive {
@@ -358,18 +387,23 @@ final class AchievementManager {
     // MARK: - Data Fetching
 
     private func fetchSettings(context: ModelContext) -> UserSettings? {
-        let descriptor = FetchDescriptor<UserSettings>()
+        var descriptor = FetchDescriptor<UserSettings>()
+        descriptor.fetchLimit = 1
         return try? context.fetch(descriptor).first
     }
 
     private func fetchSessions(context: ModelContext) -> [StudySession] {
-        let descriptor = FetchDescriptor<StudySession>()
+        // Only fetch sessions from the last 30 days for achievement checks
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let descriptor = FetchDescriptor<StudySession>(
+            predicate: #Predicate { $0.startTime >= cutoff }
+        )
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    private func fetchMessages(context: ModelContext) -> [ChatMessage] {
+    private func fetchMessageCount(context: ModelContext) -> Int {
         let descriptor = FetchDescriptor<ChatMessage>()
-        return (try? context.fetch(descriptor)) ?? []
+        return (try? context.fetchCount(descriptor)) ?? 0
     }
 
     private func fetchKnowledge(context: ModelContext) -> [StudentKnowledge] {
@@ -378,13 +412,28 @@ final class AchievementManager {
     }
 
     private func fetchQuizzes(context: ModelContext) -> [QuizQuestion] {
-        let descriptor = FetchDescriptor<QuizQuestion>()
+        // Only fetch quizzes that have been answered
+        let descriptor = FetchDescriptor<QuizQuestion>(
+            predicate: #Predicate { $0.wasAnsweredCorrectly != nil }
+        )
         return (try? context.fetch(descriptor)) ?? []
     }
 
     private func fetchDailyActivities(context: ModelContext) -> [DailyActivity] {
-        let descriptor = FetchDescriptor<DailyActivity>()
+        // Only fetch last 100 days for streak calculations
+        let cutoff = Calendar.current.date(byAdding: .day, value: -100, to: Date()) ?? Date()
+        let descriptor = FetchDescriptor<DailyActivity>(
+            predicate: #Predicate { $0.date >= cutoff },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
         return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private func fetchCompletedQuestCount(context: ModelContext) -> Int {
+        let descriptor = FetchDescriptor<DailyQuest>(
+            predicate: #Predicate { $0.isCompleted == true }
+        )
+        return (try? context.fetchCount(descriptor)) ?? 0
     }
 
     // MARK: - Statistics

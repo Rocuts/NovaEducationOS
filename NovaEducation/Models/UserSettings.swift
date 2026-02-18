@@ -192,43 +192,43 @@ enum EducationLevel: String, Codable, CaseIterable {
         }
     }
 
-    /// Pedagogical description for the AI model to adapt its responses
+    /// Pedagogical description for the AI model to adapt its responses (English for model performance)
     var pedagogicalContext: String {
         switch self {
         case .primary:
             return """
-            Estudiante de PRIMARIA (6-11 años):
-            - Usa lenguaje muy simple y claro, como si hablaras con un niño
-            - Explica con ejemplos cotidianos y concretos (juguetes, animales, familia, comida)
-            - Evita términos técnicos; si los usas, defínelos inmediatamente con palabras simples
-            - Usa analogías visuales y comparaciones con cosas que conocen
-            - Respuestas cortas y directas, no más de 2-3 párrafos
-            - Celebra los logros con entusiasmo
-            - Máximo nivel matemático: aritmética básica, fracciones simples, geometría básica
-            - Usa emojis ocasionalmente para hacer la conversación más amigable
+            PRIMARY SCHOOL student (ages 6-11):
+            - Use very simple, clear language as if speaking to a child
+            - Explain with everyday, concrete examples (toys, animals, family, food)
+            - Avoid technical terms; if used, define them immediately with simple words
+            - Use visual analogies and comparisons with familiar things
+            - Keep responses short and direct, no more than 2-3 paragraphs
+            - Celebrate achievements enthusiastically
+            - Max math level: basic arithmetic, simple fractions, basic geometry
+            - Use emojis occasionally to make the conversation friendlier
             """
         case .secondary:
             return """
-            Estudiante de SECUNDARIA/BACHILLERATO (12-17 años):
-            - Lenguaje claro pero puedes usar vocabulario técnico con explicaciones
-            - Explica el "por qué" detrás de los conceptos, no solo el "qué"
-            - Usa ejemplos de la vida adolescente (tecnología, redes sociales, deportes, música)
-            - Puedes usar abstracciones y razonamiento lógico
-            - Fomenta el pensamiento crítico con preguntas de reflexión
-            - Conecta temas con aplicaciones del mundo real y posibles carreras
-            - Nivel matemático: álgebra, geometría, trigonometría, introducción al cálculo
-            - Fomenta análisis crítico y argumentación
+            SECONDARY/HIGH SCHOOL student (ages 12-17):
+            - Clear language but you may use technical vocabulary with explanations
+            - Explain the "why" behind concepts, not just the "what"
+            - Use examples from teen life (technology, social media, sports, music)
+            - You may use abstractions and logical reasoning
+            - Encourage critical thinking with reflective questions
+            - Connect topics to real-world applications and potential careers
+            - Math level: algebra, geometry, trigonometry, intro to calculus
+            - Foster critical analysis and argumentation
             """
         case .university:
             return """
-            Estudiante UNIVERSITARIO (18+ años):
-            - Usa terminología técnica y académica apropiada sin necesidad de simplificar
-            - Explicaciones profundas con rigor académico
-            - Puedes hacer referencias a literatura, papers y fuentes cuando sea relevante
-            - Fomenta pensamiento independiente, investigación y cuestionamiento
-            - Nivel matemático: cálculo, álgebra lineal, estadística, según la carrera
-            - Trata al estudiante como colega en formación
-            - Puedes sugerir recursos adicionales para profundizar
+            UNIVERSITY student (ages 18+):
+            - Use appropriate technical and academic terminology without simplifying
+            - Deep explanations with academic rigor
+            - You may reference literature, papers, and sources when relevant
+            - Encourage independent thinking, research, and questioning
+            - Math level: calculus, linear algebra, statistics, as appropriate
+            - Treat the student as a colleague in training
+            - You may suggest additional resources to deepen understanding
             """
         }
     }

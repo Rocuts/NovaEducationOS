@@ -7,6 +7,7 @@ struct SearchView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ChatMessage.timestamp, order: .reverse) private var allMessages: [ChatMessage]
     @State private var searchText = ""
+    @State private var resultsAppeared = false
 
     private var filteredSubjects: [Subject] {
         if searchText.isEmpty {
@@ -31,7 +32,7 @@ struct SearchView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: Nova.Spacing.lg) {
                 if searchText.isEmpty {
                     // Estado inicial: mostrar todas las materias
                     subjectResultsSection(title: "Todas las materias", subjects: filteredSubjects)
@@ -50,35 +51,40 @@ struct SearchView: View {
                 }
             }
             .padding()
+            .onAppear { resultsAppeared = true }
         }
-        .contentMargins(.bottom, 100, for: .scrollContent)
+        .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
         .background(backgroundGradient)
         .navigationTitle("Buscar")
         .searchable(text: $searchText, prompt: "Buscar materia o en tus conversaciones...")
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
     }
 
     // MARK: - Subject Results Section
     @ViewBuilder
     private func subjectResultsSection(title: String, subjects: [Subject]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Nova.Spacing.md) {
             if !searchText.isEmpty {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, Nova.Spacing.xxs)
             }
 
-            ForEach(subjects) { subject in
+            ForEach(Array(subjects.enumerated()), id: \.element.id) { index, subject in
                 SearchResultRow(subject: subject) {
                     selectedSubject = subject
                 }
+                .opacity(resultsAppeared ? 1 : 0)
+                .offset(y: resultsAppeared ? 0 : 15)
+                .animation(Nova.Animation.stagger(index: index), value: resultsAppeared)
             }
         }
     }
 
     // MARK: - Chat Results Section
     private var chatResultsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Nova.Spacing.md) {
             HStack {
                 Text("En tus conversaciones")
                     .font(.headline)
@@ -90,7 +96,7 @@ struct SearchView: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Nova.Spacing.xxs)
 
             ForEach(filteredMessages) { message in
                 ChatResultRow(message: message, searchText: searchText) {
@@ -104,7 +110,7 @@ struct SearchView: View {
 
     // MARK: - Empty State
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Nova.Spacing.lg) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
@@ -112,26 +118,18 @@ struct SearchView: View {
             Text("No se encontraron resultados")
                 .font(.headline)
 
-            Text("Intenta buscar con otras palabras")
+            Text("Prueba con otras palabras o revisa la ortografía")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.vertical, Nova.Spacing.ultra)
     }
 
     // MARK: - Background
     private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(uiColor: .systemBackground),
-                Color.blue.opacity(0.05),
-                Color(uiColor: .systemBackground)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        Color(uiColor: .systemGroupedBackground)
+            .ignoresSafeArea()
     }
 }
 
@@ -142,7 +140,7 @@ struct SearchResultRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 16) {
+            HStack(spacing: Nova.Spacing.lg) {
                 // Icon
                 ZStack {
                     Circle()
@@ -155,7 +153,7 @@ struct SearchResultRow: View {
                 }
 
                 // Text
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Nova.Spacing.xxs) {
                     Text(subject.displayName)
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -174,7 +172,9 @@ struct SearchResultRow: View {
                     .foregroundStyle(.tertiary)
             }
             .padding()
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Nova.Radius.lg))
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Toca dos veces para abrir")
         }
         .buttonStyle(.plain)
     }
@@ -233,7 +233,7 @@ struct ChatResultRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
+            HStack(spacing: Nova.Spacing.md) {
                 // Icon de la materia
                 ZStack {
                     Circle()
@@ -246,7 +246,7 @@ struct ChatResultRow: View {
                 }
 
                 // Contenido
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Nova.Spacing.xs) {
                     HStack {
                         Text(subject?.displayName ?? "Chat")
                             .font(.subheadline)
@@ -272,8 +272,10 @@ struct ChatResultRow: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(12)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .padding(Nova.Spacing.md)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Nova.Radius.md))
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Toca dos veces para ver esta conversación")
         }
         .buttonStyle(.plain)
     }
@@ -284,27 +286,27 @@ extension Subject {
     var searchKeywords: [String] {
         switch self {
         case .math:
-            return ["algebra", "calculo", "geometria", "numeros", "ecuaciones", "matematica"]
+            return ["álgebra", "algebra", "cálculo", "calculo", "geometría", "geometria", "números", "numeros", "ecuaciones", "matemática", "matematica"]
         case .physics:
-            return ["mecanica", "energia", "fuerza", "movimiento", "ondas", "electricidad"]
+            return ["mecánica", "mecanica", "energía", "energia", "fuerza", "movimiento", "ondas", "electricidad"]
         case .chemistry:
-            return ["elementos", "reacciones", "atomos", "moleculas", "tabla periodica"]
+            return ["elementos", "reacciones", "átomos", "atomos", "moléculas", "moleculas", "tabla periódica", "tabla periodica"]
         case .science:
-            return ["biologia", "naturaleza", "animales", "plantas", "ecosistema", "ciencia"]
+            return ["biología", "biologia", "naturaleza", "animales", "plantas", "ecosistema", "ciencia"]
         case .social:
-            return ["historia", "geografia", "sociedad", "cultura", "economia"]
+            return ["historia", "geografía", "geografia", "sociedad", "cultura", "economía", "economia"]
         case .language:
-            return ["espanol", "gramatica", "literatura", "escritura", "lectura", "lengua"]
+            return ["español", "espanol", "gramática", "gramatica", "literatura", "escritura", "lectura", "lengua"]
         case .english:
             return ["idioma", "vocabulario", "grammar", "speaking", "writing"]
         case .ethics:
-            return ["valores", "moral", "ciudadania", "convivencia", "filosofia"]
+            return ["valores", "moral", "ciudadanía", "ciudadania", "convivencia", "filosofía", "filosofia"]
         case .technology:
-            return ["computacion", "programacion", "internet", "digital", "informatica"]
+            return ["computación", "computacion", "programación", "programacion", "internet", "digital", "informática", "informatica"]
         case .arts:
-            return ["musica", "pintura", "dibujo", "teatro", "danza", "creatividad"]
+            return ["música", "musica", "pintura", "dibujo", "teatro", "danza", "creatividad"]
         case .sports:
-            return ["educacion fisica", "ejercicio", "deporte", "salud", "actividad"]
+            return ["educación física", "educacion fisica", "ejercicio", "deporte", "salud", "actividad"]
         case .open:
             return ["general", "libre", "cualquier", "otro", "pregunta"]
         }
@@ -313,27 +315,27 @@ extension Subject {
     var shortDescription: String {
         switch self {
         case .math:
-            return "Algebra, calculo, geometria y mas"
+            return "Álgebra, cálculo, geometría y más"
         case .physics:
-            return "Mecanica, energia y fenomenos fisicos"
+            return "Mecánica, energía y fenómenos físicos"
         case .chemistry:
             return "Elementos, reacciones y compuestos"
         case .science:
-            return "Biologia, ecologia y medio ambiente"
+            return "Biología, ecología y medio ambiente"
         case .social:
-            return "Historia, geografia y sociedad"
+            return "Historia, geografía y sociedad"
         case .language:
-            return "Gramatica, literatura y expresion"
+            return "Gramática, literatura y expresión"
         case .english:
-            return "Vocabulario, gramatica y conversacion"
+            return "Vocabulario, gramática y conversación"
         case .ethics:
-            return "Valores, ciudadania y convivencia"
+            return "Valores, ciudadanía y convivencia"
         case .technology:
-            return "Computacion, programacion y digital"
+            return "Computación, programación y digital"
         case .arts:
-            return "Musica, pintura y expresion artistica"
+            return "Música, pintura y expresión artística"
         case .sports:
-            return "Educacion fisica y bienestar"
+            return "Educación física y bienestar"
         case .open:
             return "Pregunta sobre cualquier tema"
         }

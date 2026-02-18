@@ -7,57 +7,39 @@ import SwiftData
 /// Tool that allows the AI to store information about the student's learning
 final class MemoryStoreTool: Tool, @unchecked Sendable {
     let name = "storeStudentKnowledge"
+    let includesSchemaInInstructions = false
 
     typealias Output = String
 
-    let description = """
-    Stores important information about the student's learning progress.
-
-    USE THIS TOOL when the student:
-    • Demonstrates understanding of a concept ("Ya entiendo las fracciones")
-    • Shows difficulty with something ("No entiendo los logaritmos")
-    • Mentions their interests ("Me gusta la astronomía")
-    • Has a misconception you corrected
-    • Shows a particular strength
-    • Mentions their academic goals
-
-    EXAMPLES:
-    - Student says "¡Ahora sí entiendo!" after explaining derivatives → store as "concept"
-    - Student struggles repeatedly with fractions → store as "difficulty"
-    - Student asks many questions about space → store as "interest"
-    - Student confuses velocity with acceleration → store as "misconception"
-
-    DO NOT store: greetings, off-topic chat, temporary confusion during explanation.
-    """
+    let description = "Stores a learning fact about the student."
 
     @Generable
     struct Arguments {
-        @Guide(description: "What to remember about the student. Be specific and concise. Example: 'Understands how to solve quadratic equations using the formula'")
+        @Guide(description: "Fact to store")
         let knowledge: String
 
-        @Guide(description: "Category: 'concept' (learned), 'difficulty' (struggles with), 'preference' (learning style), 'interest' (topics they like), 'misconception' (wrong understanding), 'strength' (good at), 'goal' (academic objective)")
+        @Guide(description: "concept, difficulty, interest, or preference")
         let category: String
 
-        @Guide(description: "Mastery level from 0.0 to 1.0. Use 0.8+ for mastered, 0.5 for learning, 0.3 for struggling")
+        @Guide(description: "0.0 to 1.0")
         let masteryLevel: Double
     }
 
-    /// Callback to store knowledge (will be set by FoundationModelService)
-    var onStoreKnowledge: ((String, KnowledgeCategory, Double) -> Void)?
+    /// Set once from @MainActor before any call() invocation. Read in call() via MainActor.run.
+    nonisolated(unsafe) var onStoreKnowledge: ((String, KnowledgeCategory, Double) -> Void)?
 
     /// Current subject ID (set by FoundationModelService)
-    var currentSubjectId: String = "open"
+    nonisolated(unsafe) var currentSubjectId: String = "open"
 
     func call(arguments: Arguments) async throws -> String {
         let category = KnowledgeCategory(rawValue: arguments.category) ?? .concept
         let mastery = max(0, min(1, arguments.masteryLevel))
 
-        let resultText = await MainActor.run {
+        await MainActor.run {
             onStoreKnowledge?(arguments.knowledge, category, mastery)
-            return "Guardado: \(arguments.knowledge) (categoría: \(category.displayName), dominio: \(Int(mastery * 100))%)"
         }
 
-        return resultText
+        return "Stored."
     }
 }
 
@@ -66,37 +48,23 @@ final class MemoryStoreTool: Tool, @unchecked Sendable {
 /// Tool that allows the AI to retrieve stored information about the student
 final class MemoryRecallTool: Tool, @unchecked Sendable {
     let name = "recallStudentKnowledge"
+    let includesSchemaInInstructions = false
 
     typealias Output = String
 
-    let description = """
-    Retrieves stored information about the student's learning history.
-
-    USE THIS TOOL when you need to:
-    • Check what the student already knows before explaining
-    • Review their difficulties to provide targeted help
-    • Reference their interests to make examples more engaging
-    • Build on previously learned concepts
-
-    EXAMPLES:
-    - Before teaching algebra, check if they understand arithmetic
-    - When student seems lost, recall their known difficulties
-    - Make examples about their interests (e.g., if they like soccer, use sports examples)
-
-    This helps you personalize your teaching to this specific student.
-    """
+    let description = "Retrieves stored student knowledge."
 
     @Generable
     struct Arguments {
-        @Guide(description: "What type of information to recall: 'all' (everything), 'concepts' (what they know), 'difficulties' (what they struggle with), 'interests' (what they like), 'profile' (full summary)")
+        @Guide(description: "all, concepts, difficulties, interests, or profile")
         let queryType: String
 
-        @Guide(description: "Optional: specific topic to search for, e.g., 'fractions', 'algebra'. Leave empty for general recall.")
+        @Guide(description: "Topic filter")
         let topic: String?
     }
 
-    /// Callback to recall knowledge (will be set by FoundationModelService)
-    var onRecallKnowledge: ((String, String?) -> String)?
+    /// Set once from @MainActor before any call() invocation. Read in call() via MainActor.run.
+    nonisolated(unsafe) var onRecallKnowledge: (@MainActor (String, String?) -> String)?
 
     func call(arguments: Arguments) async throws -> String {
         guard let callback = onRecallKnowledge else {
@@ -116,46 +84,35 @@ final class MemoryRecallTool: Tool, @unchecked Sendable {
 /// Tool that allows the AI to generate quiz questions to evaluate the student
 final class QuizGeneratorTool: Tool, @unchecked Sendable {
     let name = "generateQuizQuestion"
+    let includesSchemaInInstructions = false
 
     typealias Output = String
 
-    let description = """
-    Generates a quiz question to evaluate the student's understanding.
-
-    USE THIS TOOL when:
-    • Student asks to be tested ("Hazme una pregunta", "Evalúame")
-    • After explaining a concept, to verify understanding
-    • Student says they're ready to practice
-    • You want to identify gaps in their knowledge
-
-    The quiz will be stored and tracked for progress monitoring.
-
-    DO NOT use for: regular explanations, casual conversation, when student is frustrated.
-    """
+    let description = "Generates a multiple-choice quiz question."
 
     @Generable
     struct Arguments {
-        @Guide(description: "The question to ask the student")
+        @Guide(description: "Question text in Spanish")
         let question: String
 
-        @Guide(description: "Array of 4 possible answers for multiple choice")
+        @Guide(description: "Exactly 4 options")
         let options: [String]
 
-        @Guide(description: "The correct answer (must match one of the options exactly)")
+        @Guide(description: "Correct option text")
         let correctAnswer: String
 
-        @Guide(description: "Brief explanation of why the answer is correct")
+        @Guide(description: "Brief explanation")
         let explanation: String
 
-        @Guide(description: "The concept being tested, e.g., 'quadratic equations', 'photosynthesis'")
+        @Guide(description: "Concept tested")
         let relatedConcept: String
 
-        @Guide(description: "Difficulty: 'easy', 'medium', or 'hard'")
+        @Guide(description: "easy, medium, or hard")
         let difficulty: String
     }
 
-    /// Callback to store the quiz question
-    var onQuizGenerated: ((String, [String], String, String, String, QuizDifficulty) -> Void)?
+    /// Set once from @MainActor before any call() invocation. Read in call() via MainActor.run.
+    nonisolated(unsafe) var onQuizGenerated: ((String, [String], String, String, String, QuizDifficulty) -> Void)?
 
     func call(arguments: Arguments) async throws -> String {
         let difficulty = QuizDifficulty(rawValue: arguments.difficulty) ?? .medium
@@ -171,93 +128,7 @@ final class QuizGeneratorTool: Tool, @unchecked Sendable {
             )
         }
 
-        // Format the quiz for display
-        var quizText = "📝 **Pregunta de evaluación**\n\n"
-        quizText += "\(arguments.question)\n\n"
-
-        for (index, option) in arguments.options.enumerated() {
-            let letter = ["A", "B", "C", "D"][index]
-            quizText += "**\(letter).** \(option)\n"
-        }
-
-        quizText += "\n_Responde con la letra de tu respuesta._"
-
-        return quizText
+        return "Quiz ready."
     }
 }
 
-// MARK: - Learning Plan Tool
-
-/// Tool that allows the AI to create a structured learning plan
-final class LearningPlanTool: Tool, @unchecked Sendable {
-    let name = "createLearningPlan"
-
-    typealias Output = String
-
-    let description = """
-    Creates a structured learning plan for a complex topic.
-
-    USE THIS TOOL when:
-    • Student asks to learn a broad topic ("Enséñame cálculo", "Quiero aprender química orgánica")
-    • Topic requires multiple prerequisite concepts
-    • Student seems overwhelmed and needs structure
-    • Long-term learning goal is identified
-
-    The plan breaks down the topic into sequential, manageable steps.
-
-    DO NOT use for: simple questions, single-concept explanations, quick help.
-    """
-
-    @Generable
-    struct Arguments {
-        @Guide(description: "The main topic the plan covers, e.g., 'Cálculo diferencial', 'Gramática inglesa'")
-        let topic: String
-
-        @Guide(description: "Array of learning steps, each with 'title', 'description', and optional 'prerequisite'")
-        let steps: [PlanStep]
-    }
-
-    @Generable
-    struct PlanStep {
-        @Guide(description: "Short title for this step, e.g., 'Límites'")
-        let title: String
-
-        @Guide(description: "What will be learned in this step")
-        let description: String
-
-        @Guide(description: "Optional: what needs to be understood first")
-        let prerequisite: String?
-    }
-
-    /// Callback to store the learning plan
-    var onPlanCreated: ((String, [LearningStep]) -> Void)?
-
-    func call(arguments: Arguments) async throws -> String {
-        await MainActor.run {
-            let steps = arguments.steps.map { step in
-                LearningStep(
-                    title: step.title,
-                    description: step.description,
-                    prerequisite: step.prerequisite
-                )
-            }
-            onPlanCreated?(arguments.topic, steps)
-        }
-
-        // Format the plan for display
-        var planText = "📋 **Plan de aprendizaje: \(arguments.topic)**\n\n"
-
-        for (index, step) in arguments.steps.enumerated() {
-            planText += "**\(index + 1). \(step.title)**\n"
-            planText += "   \(step.description)\n"
-            if let prereq = step.prerequisite, !prereq.isEmpty {
-                planText += "   _Requiere: \(prereq)_\n"
-            }
-            planText += "\n"
-        }
-
-        planText += "---\n_¿Empezamos con el paso 1?_"
-
-        return planText
-    }
-}

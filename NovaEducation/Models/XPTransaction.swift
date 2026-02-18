@@ -4,6 +4,8 @@ import Foundation
 /// Representa una transacción de XP ganado por el estudiante
 @Model
 final class XPTransaction {
+    #Index<XPTransaction>([\.sourceRaw, \.timestamp], [\.timestamp])
+
     var id: UUID
     var amount: Int              // XP ganado (ya con multiplicador aplicado)
     var baseAmount: Int          // XP base antes de multiplicador
@@ -146,6 +148,7 @@ enum PlayerLevel {
         let currentLevel = level(fromTotalXP: xp)
         let xpForCurrentLevel = totalXPRequired(forLevel: currentLevel)
         let xpForNextLevel = xpRequired(forLevel: currentLevel)
+        guard xpForNextLevel > 0 else { return 0 }
         let xpInCurrentLevel = xp - xpForCurrentLevel
 
         return Double(xpInCurrentLevel) / Double(xpForNextLevel)

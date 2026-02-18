@@ -22,13 +22,15 @@ struct HistoryView: View {
         .sorted { $0.lastMessage.timestamp > $1.lastMessage.timestamp }
     }
 
+    @State private var rowsAppeared = false
+
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: Nova.Spacing.md) {
                 if recentConversations.isEmpty {
                     emptyStateView
                 } else {
-                    ForEach(recentConversations, id: \.subject.id) { conversation in
+                    ForEach(Array(recentConversations.enumerated()), id: \.element.subject.id) { index, conversation in
                         ConversationRow(
                             subject: conversation.subject,
                             lastMessage: conversation.lastMessage,
@@ -36,48 +38,46 @@ struct HistoryView: View {
                         ) {
                             selectedSubject = conversation.subject
                         }
+                        .opacity(rowsAppeared ? 1 : 0)
+                        .offset(y: rowsAppeared ? 0 : 20)
+                        .animation(Nova.Animation.stagger(index: index), value: rowsAppeared)
                     }
                 }
             }
             .padding()
+            .onAppear { rowsAppeared = true }
         }
-        .contentMargins(.bottom, 100, for: .scrollContent)
+        .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
         .background(backgroundGradient)
         .navigationTitle("Historial")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
     }
 
     // MARK: - Empty State
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Nova.Spacing.lg) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
+                .symbolEffect(.pulse, options: .repeating)
 
             Text("Sin conversaciones")
                 .font(.headline)
 
-            Text("Tus conversaciones recientes apareceran aqui")
+            Text("Inicia tu primera conversación eligiendo una materia")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .padding(.vertical, Nova.Spacing.ultra)
     }
 
     // MARK: - Background
     private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(uiColor: .systemBackground),
-                Color.purple.opacity(0.05),
-                Color(uiColor: .systemBackground)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        Color(uiColor: .systemGroupedBackground)
+            .ignoresSafeArea()
     }
 }
 
@@ -105,7 +105,7 @@ struct ConversationRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 16) {
+            HStack(spacing: Nova.Spacing.lg) {
                 // Subject Icon
                 ZStack {
                     Circle()
@@ -118,7 +118,7 @@ struct ConversationRow: View {
                 }
 
                 // Content
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Nova.Spacing.xxs) {
                     HStack {
                         Text(subject.displayName)
                             .font(.headline)
@@ -136,7 +136,7 @@ struct ConversationRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
-                    HStack(spacing: 4) {
+                    HStack(spacing: Nova.Spacing.xxs) {
                         Image(systemName: "message.fill")
                             .font(.caption2)
                         Text("\(messageCount) mensajes")
@@ -151,7 +151,10 @@ struct ConversationRow: View {
                     .foregroundStyle(.tertiary)
             }
             .padding()
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Nova.Radius.lg))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(subject.displayName), \(previewText)")
+            .accessibilityHint("Toca dos veces para abrir esta conversación")
         }
         .buttonStyle(.plain)
     }

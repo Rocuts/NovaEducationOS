@@ -7,23 +7,21 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settingsArray: [UserSettings]
     @State private var selectedSubject: Subject?
-
-    private var settings: UserSettings {
-        if let existing = settingsArray.first {
-            return existing
-        } else {
-            let newSettings = UserSettings()
-            modelContext.insert(newSettings)
-            return newSettings
-        }
-    }
+    @Namespace private var transitionNamespace
 
     var body: some View {
         NavigationStack {
-            HomeView(selectedSubject: $selectedSubject, settings: settings)
-                .navigationDestination(item: $selectedSubject) { subject in
-                    ChatView(subject: subject)
-                }
+            if let settings = settingsArray.first {
+                HomeView(selectedSubject: $selectedSubject, settings: settings, transitionNamespace: transitionNamespace)
+                    .navigationDestination(item: $selectedSubject) { subject in
+                        ChatView(subject: subject)
+                    }
+            } else {
+                ProgressView()
+                    .onAppear {
+                        modelContext.insert(UserSettings())
+                    }
+            }
         }
     }
 }

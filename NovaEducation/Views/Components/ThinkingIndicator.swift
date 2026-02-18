@@ -1,36 +1,52 @@
 import SwiftUI
 
-/// Animated thinking indicator with three bouncing dots
+/// Animated thinking indicator with three bouncing dots.
+/// Uses PhaseAnimator for lifecycle-safe animations instead of Timer.scheduledTimer.
 struct ThinkingIndicator: View {
     let color: Color
-    @State private var animatingDot = 0
 
     private let dotSize: CGFloat = 8
-    private let animationDuration: Double = 0.4
+
+    /// Phases cycle through highlighting each dot, then a brief pause.
+    private enum Phase: CaseIterable {
+        case dot0, dot1, dot2, pause
+    }
 
     var body: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(color.opacity(animatingDot == index ? 1 : 0.4))
-                    .frame(width: dotSize, height: dotSize)
-                    .offset(y: animatingDot == index ? -4 : 0)
-                    .animation(
-                        .easeInOut(duration: animationDuration),
-                        value: animatingDot
-                    )
+        PhaseAnimator(Phase.allCases) { phase in
+            HStack(spacing: 6) {
+                ForEach(0..<3) { index in
+                    Circle()
+                        .fill(color.opacity(dotOpacity(for: index, in: phase)))
+                        .frame(width: dotSize, height: dotSize)
+                        .offset(y: dotOffset(for: index, in: phase))
+                }
             }
-        }
-        .onAppear {
-            startAnimation()
+        } animation: { phase in
+            switch phase {
+            case .pause:
+                Nova.Animation.exitMedium
+            default:
+                Nova.Animation.dotBounce
+            }
         }
     }
 
-    private func startAnimation() {
-        Timer.scheduledTimer(withTimeInterval: animationDuration, repeats: true) { _ in
-            withAnimation {
-                animatingDot = (animatingDot + 1) % 3
-            }
+    private func dotOpacity(for index: Int, in phase: Phase) -> Double {
+        switch phase {
+        case .dot0: index == 0 ? 1.0 : 0.4
+        case .dot1: index == 1 ? 1.0 : 0.4
+        case .dot2: index == 2 ? 1.0 : 0.4
+        case .pause: 0.4
+        }
+    }
+
+    private func dotOffset(for index: Int, in phase: Phase) -> CGFloat {
+        switch phase {
+        case .dot0: index == 0 ? -4 : 0
+        case .dot1: index == 1 ? -4 : 0
+        case .dot2: index == 2 ? -4 : 0
+        case .pause: 0
         }
     }
 }

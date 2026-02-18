@@ -4,6 +4,8 @@ import SwiftUI
 
 @Model
 final class Achievement {
+    #Index<Achievement>([\.isUnlocked])
+
     @Attribute(.unique) var id: String
     var isUnlocked: Bool
     var unlockedAt: Date?
@@ -130,7 +132,7 @@ enum AchievementCategory: String, CaseIterable {
 /// Definición estática de todos los logros
 enum AchievementType: String, CaseIterable {
 
-    // MARK: - Aprendizaje (8)
+    // MARK: - Aprendizaje (11)
     case firstMessage = "first_message"
     case curious10 = "curious_10"
     case curious100 = "curious_100"
@@ -139,6 +141,9 @@ enum AchievementType: String, CaseIterable {
     case quizMaster10 = "quiz_master_10"
     case quizMaster50 = "quiz_master_50"
     case planCompleted = "plan_completed"
+    case questComplete3 = "quest_complete_3"
+    case questComplete10 = "quest_complete_10"
+    case questComplete50 = "quest_complete_50"
 
     // MARK: - Rachas (6)
     case streak3 = "streak_3"
@@ -148,13 +153,14 @@ enum AchievementType: String, CaseIterable {
     case comeback = "comeback"
     case perfectWeek = "perfect_week"
 
-    // MARK: - Exploración (6)
+    // MARK: - Exploración (7)
     case explorer3 = "explorer_3"
     case explorer6 = "explorer_6"
     case explorer12 = "explorer_12"
     case deepDive = "deep_dive"
     case marathon = "marathon"
     case ultraMarathon = "ultra_marathon"
+    case multiSubjectDay = "multi_subject_day"
 
     // MARK: - Horarios (4)
     case earlyBird = "early_bird"
@@ -169,10 +175,14 @@ enum AchievementType: String, CaseIterable {
     case perfectScore = "perfect_score"
     case knowledgeKeeper = "knowledge_keeper"
 
-    // MARK: - Niveles (3)
+    // MARK: - Niveles (7)
+    case level3 = "level_3"
     case level5 = "level_5"
     case level10 = "level_10"
     case level20 = "level_20"
+    case xpCollector500 = "xp_collector_500"
+    case xpCollector2000 = "xp_collector_2000"
+    case xpCollector10000 = "xp_collector_10000"
 
     // MARK: - Properties
 
@@ -187,6 +197,9 @@ enum AchievementType: String, CaseIterable {
         case .quizMaster10: return "Aprendiz de Quiz"
         case .quizMaster50: return "Maestro del Quiz"
         case .planCompleted: return "Planificador"
+        case .questComplete3: return "Misionero"
+        case .questComplete10: return "Cazamisiones"
+        case .questComplete50: return "Leyenda de Misiones"
         // Rachas
         case .streak3: return "Constante"
         case .streak7: return "Dedicado"
@@ -201,6 +214,7 @@ enum AchievementType: String, CaseIterable {
         case .deepDive: return "Inmersión"
         case .marathon: return "Maratón"
         case .ultraMarathon: return "Ultra Maratón"
+        case .multiSubjectDay: return "Multitarea"
         // Horarios
         case .earlyBird: return "Madrugador"
         case .nightOwl: return "Búho Nocturno"
@@ -213,9 +227,13 @@ enum AchievementType: String, CaseIterable {
         case .perfectScore: return "Puntuación Perfecta"
         case .knowledgeKeeper: return "Guardián del Conocimiento"
         // Niveles
+        case .level3: return "Primeros Pasos"
         case .level5: return "Nivel 5"
         case .level10: return "Nivel 10"
         case .level20: return "Nivel 20"
+        case .xpCollector500: return "Coleccionista"
+        case .xpCollector2000: return "Acumulador"
+        case .xpCollector10000: return "Magnate del XP"
         }
     }
 
@@ -230,6 +248,9 @@ enum AchievementType: String, CaseIterable {
         case .quizMaster10: return "Consigue 10 quizzes perfectos"
         case .quizMaster50: return "Consigue 50 quizzes perfectos"
         case .planCompleted: return "Completa un plan de aprendizaje"
+        case .questComplete3: return "Completa 3 misiones diarias"
+        case .questComplete10: return "Completa 10 misiones diarias"
+        case .questComplete50: return "Completa 50 misiones diarias"
         // Rachas
         case .streak3: return "Estudia 3 días seguidos"
         case .streak7: return "Estudia 7 días seguidos"
@@ -244,6 +265,7 @@ enum AchievementType: String, CaseIterable {
         case .deepDive: return "Estudia 30 min en una sesión"
         case .marathon: return "Estudia 60 min en una sesión"
         case .ultraMarathon: return "Estudia 120 min en una sesión"
+        case .multiSubjectDay: return "Estudia 3 materias en un solo día"
         // Horarios
         case .earlyBird: return "Estudia antes de las 7 AM"
         case .nightOwl: return "Estudia después de las 11 PM"
@@ -256,9 +278,13 @@ enum AchievementType: String, CaseIterable {
         case .perfectScore: return "100% en un quiz de 10 preguntas"
         case .knowledgeKeeper: return "Almacena 50 conceptos"
         // Niveles
+        case .level3: return "Alcanza el nivel 3"
         case .level5: return "Alcanza el nivel 5"
         case .level10: return "Alcanza el nivel 10"
         case .level20: return "Alcanza el nivel 20"
+        case .xpCollector500: return "Acumula 500 XP en total"
+        case .xpCollector2000: return "Acumula 2000 XP en total"
+        case .xpCollector10000: return "Acumula 10000 XP en total"
         }
     }
 
@@ -269,6 +295,7 @@ enum AchievementType: String, CaseIterable {
         case .curious10, .curious100, .curious1000: return "questionmark.circle.fill"
         case .quizFirst, .quizMaster10, .quizMaster50: return "checkmark.seal.fill"
         case .planCompleted: return "list.bullet.clipboard.fill"
+        case .questComplete3, .questComplete10, .questComplete50: return "target"
         // Rachas
         case .streak3, .streak7, .streak30, .streak100: return "flame.fill"
         case .comeback: return "arrow.counterclockwise"
@@ -278,6 +305,7 @@ enum AchievementType: String, CaseIterable {
         case .deepDive: return "figure.pool.swim"
         case .marathon: return "figure.run"
         case .ultraMarathon: return "figure.hiking"
+        case .multiSubjectDay: return "square.grid.3x3.fill"
         // Horarios
         case .earlyBird: return "sunrise.fill"
         case .nightOwl: return "moon.stars.fill"
@@ -290,9 +318,13 @@ enum AchievementType: String, CaseIterable {
         case .perfectScore: return "100.circle.fill"
         case .knowledgeKeeper: return "books.vertical.fill"
         // Niveles
+        case .level3: return "3.circle.fill"
         case .level5: return "5.circle.fill"
         case .level10: return "10.circle.fill"
         case .level20: return "20.circle.fill"
+        case .xpCollector500: return "star.circle.fill"
+        case .xpCollector2000: return "star.square.fill"
+        case .xpCollector10000: return "crown.fill"
         }
     }
 
@@ -300,28 +332,31 @@ enum AchievementType: String, CaseIterable {
         switch self {
         // Bronce (fáciles)
         case .firstMessage, .curious10, .quizFirst, .planCompleted,
+             .questComplete3,
              .streak3, .comeback,
              .explorer3, .deepDive,
              .earlyBird, .nightOwl, .lunchLearner,
              .firstMastery,
-             .level5:
+             .level3, .level5, .xpCollector500:
             return .bronze
 
         // Plata (intermedios)
         case .curious100, .quizMaster10,
+             .questComplete10,
              .streak7, .perfectWeek,
-             .explorer6, .marathon,
+             .explorer6, .marathon, .multiSubjectDay,
              .weekendWarrior,
              .subjectExpert, .perfectScore,
-             .level10:
+             .level10, .xpCollector2000:
             return .silver
 
         // Oro (difíciles)
         case .curious1000, .quizMaster50,
+             .questComplete50,
              .streak30, .streak100,
              .explorer12, .ultraMarathon,
              .polymath, .knowledgeKeeper,
-             .level20:
+             .level20, .xpCollector10000:
             return .gold
         }
     }
@@ -329,27 +364,30 @@ enum AchievementType: String, CaseIterable {
     var category: AchievementCategory {
         switch self {
         case .firstMessage, .curious10, .curious100, .curious1000,
-             .quizFirst, .quizMaster10, .quizMaster50, .planCompleted:
+             .quizFirst, .quizMaster10, .quizMaster50, .planCompleted,
+             .questComplete3, .questComplete10, .questComplete50:
             return .learning
         case .streak3, .streak7, .streak30, .streak100, .comeback, .perfectWeek:
             return .streaks
-        case .explorer3, .explorer6, .explorer12, .deepDive, .marathon, .ultraMarathon:
+        case .explorer3, .explorer6, .explorer12, .deepDive, .marathon, .ultraMarathon,
+             .multiSubjectDay:
             return .exploration
         case .earlyBird, .nightOwl, .lunchLearner, .weekendWarrior:
             return .schedule
         case .firstMastery, .subjectExpert, .polymath, .perfectScore, .knowledgeKeeper:
             return .mastery
-        case .level5, .level10, .level20:
+        case .level3, .level5, .level10, .level20,
+             .xpCollector500, .xpCollector2000, .xpCollector10000:
             return .levels
         }
     }
 
-    /// XP que otorga al desbloquearse
+    /// XP que otorga al desbloquearse (escalado por tier)
     var xpReward: Int {
         switch tier {
         case .bronze: return xpRewardBase
-        case .silver: return xpRewardBase
-        case .gold: return xpRewardBase
+        case .silver: return Int(Double(xpRewardBase) * 1.5)
+        case .gold: return xpRewardBase * 2
         }
     }
 
@@ -364,6 +402,9 @@ enum AchievementType: String, CaseIterable {
         case .quizMaster10: return 75
         case .quizMaster50: return 200
         case .planCompleted: return 30
+        case .questComplete3: return 20
+        case .questComplete10: return 75
+        case .questComplete50: return 200
         // Rachas
         case .streak3: return 20
         case .streak7: return 50
@@ -378,6 +419,7 @@ enum AchievementType: String, CaseIterable {
         case .deepDive: return 30
         case .marathon: return 75
         case .ultraMarathon: return 150
+        case .multiSubjectDay: return 40
         // Horarios
         case .earlyBird: return 20
         case .nightOwl: return 20
@@ -390,9 +432,13 @@ enum AchievementType: String, CaseIterable {
         case .perfectScore: return 75
         case .knowledgeKeeper: return 150
         // Niveles
+        case .level3: return 15
         case .level5: return 50
         case .level10: return 100
         case .level20: return 250
+        case .xpCollector500: return 25
+        case .xpCollector2000: return 75
+        case .xpCollector10000: return 300
         }
     }
 
@@ -407,6 +453,9 @@ enum AchievementType: String, CaseIterable {
         case .quizMaster10: return 10
         case .quizMaster50: return 50
         case .planCompleted: return 1
+        case .questComplete3: return 3
+        case .questComplete10: return 10
+        case .questComplete50: return 50
         case .streak3: return 3
         case .streak7: return 7
         case .streak30: return 30
@@ -419,6 +468,7 @@ enum AchievementType: String, CaseIterable {
         case .deepDive: return 30  // minutos
         case .marathon: return 60
         case .ultraMarathon: return 120
+        case .multiSubjectDay: return 3
         case .earlyBird: return 1
         case .nightOwl: return 1
         case .lunchLearner: return 1
@@ -428,9 +478,13 @@ enum AchievementType: String, CaseIterable {
         case .polymath: return 5
         case .perfectScore: return 1
         case .knowledgeKeeper: return 50
+        case .level3: return 3
         case .level5: return 5
         case .level10: return 10
         case .level20: return 20
+        case .xpCollector500: return 500
+        case .xpCollector2000: return 2000
+        case .xpCollector10000: return 10000
         }
     }
 
@@ -454,3 +508,4 @@ extension AchievementType {
         allCases.filter { $0.tier == tier }
     }
 }
+

@@ -5,16 +5,18 @@ struct HomeView: View {
     @Binding var selectedSubject: Subject?
     let settings: UserSettings
     @Environment(\.modelContext) private var modelContext
+    @Environment(FocusManager.self) private var focusManager
+    var transitionNamespace: Namespace.ID
 
     let columns = [
-        GridItem(.adaptive(minimum: 150), spacing: 16)
+        GridItem(.adaptive(minimum: 150), spacing: Nova.Spacing.lg)
     ]
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
         case 5..<12:
-            return "Buenos dias"
+            return "Buenos días"
         case 12..<19:
             return "Buenas tardes"
         default:
@@ -26,27 +28,64 @@ struct HomeView: View {
     @State private var todayQuests: [DailyQuest] = []
     @State private var currentStreak: Int = 0
     @State private var showQuestsExpanded = false
+    @State private var hasScrolled = false
+    @Namespace private var statsGlassNamespace
+
+    // Entrance animation states
+    @State private var headerAppeared = false
+    @State private var chipsAppeared = false
+    @State private var cardsAppeared = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Header Section with XP
+            VStack(alignment: .leading, spacing: Nova.Spacing.xl) {
+                // Scroll detection anchor
+                GeometryReader { geo in
+                    Color.clear
+                        .preference(key: ScrollOffsetPreferenceKey.self, value: geo.frame(in: .named("homeScroll")).minY)
+                }
+                .frame(height: 0)
+
                 headerSection
-
-                // Gamification Section (XP + Streak + Quests)
-                gamificationSection
-
-                // Quick Actions
                 quickActionsSection
-
-                // Subjects Grid
                 subjectsSection
             }
+            .padding(.top, Nova.Spacing.md)
         }
-        .contentMargins(.bottom, 100, for: .scrollContent)
-        .background(backgroundGradient)
-        .navigationBarHidden(true)
-        .onAppear {
+        .coordinateSpace(name: "homeScroll")
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+            let scrolled = offset < -10
+            if scrolled != hasScrolled {
+                withAnimation(Nova.Animation.springSnappy) {
+                    hasScrolled = scrolled
+                }
+            }
+        }
+        .contentMargins(.top, Nova.Spacing.sm, for: .scrollContent)
+        .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
+        .background(Color(.systemGroupedBackground))
+        .overlay(alignment: .top) {
+            // Fade overlay that covers the status bar area and creates a smooth
+            // transition so scrolled content dissolves before reaching system icons.
+            // Uses multiple gradient stops for a premium, natural fade.
+            LinearGradient(
+                stops: [
+                    .init(color: Color(.systemGroupedBackground), location: 0),
+                    .init(color: Color(.systemGroupedBackground), location: 0.5),
+                    .init(color: Color(.systemGroupedBackground).opacity(0.85), location: 0.65),
+                    .init(color: Color(.systemGroupedBackground).opacity(0.5), location: 0.8),
+                    .init(color: Color(.systemGroupedBackground).opacity(0.15), location: 0.92),
+                    .init(color: Color(.systemGroupedBackground).opacity(0), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 110)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .task {
             loadGamificationData()
         }
     }
@@ -54,17 +93,13 @@ struct HomeView: View {
     // MARK: - Load Gamification Data
 
     private func loadGamificationData() {
-        // Load daily quests
         DailyQuestService.shared.loadTodayQuests(context: modelContext)
 
-        // Generate default quests if needed
         if DailyQuestService.shared.needsQuestGeneration(context: modelContext) {
             DailyQuestService.shared.generateDefaultQuests(context: modelContext)
         }
 
         todayQuests = DailyQuestService.shared.todayQuests
-
-        // Calculate streak
         currentStreak = calculateCurrentStreak()
     }
 
@@ -91,34 +126,104 @@ struct HomeView: View {
         return streak
     }
 
-    // MARK: - Gamification Section
+    // MARK: - Header Section
 
-    private var gamificationSection: some View {
-        VStack(spacing: 16) {
-            // XP and Level Row
-            HStack(spacing: 12) {
-                // Level Badge
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: Nova.Spacing.md) {
+            // Top row: Greeting + Focus toggle
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: Nova.Spacing.xxxs) {
+                    Text(greeting)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text(settings.studentName)
+                        .font(.title.bold())
+                }
+
+                Spacer()
+
+                // Focus mode toggle - changes icon and color when active
+                Button {
+                    focusManager.toggleFocusMode()
+                } label: {
+                    Image(systemName: focusManager.isFocusModeActive ? "moon.stars.fill" : "moon.stars")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(focusManager.isFocusModeActive ? .white : .indigo)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            focusManager.isFocusModeActive
+                                ? AnyShapeStyle(.indigo)
+                                : AnyShapeStyle(.fill.quaternary)
+                        )
+                        .clipShape(Circle())
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .accessibilityLabel(focusManager.isFocusModeActive ? "Desactivar modo enfoque" : "Activar modo enfoque")
+                .accessibilityHint("Toca dos veces para alternar el modo de concentración")
+                .animation(Nova.Animation.entranceFast, value: focusManager.isFocusModeActive)
+            }
+
+            // Stats row: XP + Streak + Quests
+            statsRow
+        }
+        .padding(.horizontal, Nova.Spacing.screenHorizontal)
+        .opacity(headerAppeared ? 1 : 0)
+        .offset(y: headerAppeared ? 0 : 15)
+        .animation(Nova.Animation.entranceMedium, value: headerAppeared)
+        .onAppear { headerAppeared = true }
+    }
+
+    // MARK: - Stats Row
+
+    private var statsRow: some View {
+        HStack(spacing: Nova.Spacing.md) {
+            GlassEffectContainer(spacing: Nova.Spacing.sm) {
+                // Level + XP
                 CompactXPDisplay(
                     currentXP: settings.totalXP,
                     currentLevel: settings.currentLevel,
                     progress: settings.levelProgress
                 )
+                .glassEffectID("xpDisplay", in: statsGlassNamespace)
 
-                Spacer()
-
-                // Streak Badge
+                // Streak — morphs in/out of the XP display glass group
                 if currentStreak > 0 {
                     StreakBadge(days: currentStreak)
+                        .glassEffectID("streakBadge", in: statsGlassNamespace)
                 }
             }
-            .padding(.horizontal, 20)
 
-            // Daily Quests Card (Compact version)
+            Spacer()
+
+            // Quests shortcut
             if !todayQuests.isEmpty {
-                CompactQuestsCard(quests: todayQuests) {
+                Button {
                     showQuestsExpanded = true
+                } label: {
+                    let completed = todayQuests.filter { $0.isCompleted }.count
+                    let total = todayQuests.count
+                    let pendingXP = todayQuests.filter { $0.isActive }.reduce(0) { $0 + $1.xpReward }
+
+                    HStack(spacing: Nova.Spacing.xs) {
+                        Image(systemName: "target")
+                            .font(.caption.bold())
+                            .foregroundStyle(.blue)
+
+                        Text("\(completed)/\(total)")
+                            .font(.caption.bold())
+
+                        if pendingXP > 0 {
+                            Text("\(pendingXP) XP")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    .padding(.horizontal, Nova.Spacing.sm)
+                    .padding(.vertical, Nova.Spacing.xs)
+                    .glassEffect(.regular.interactive(), in: Capsule())
                 }
-                .padding(.horizontal, 20)
+                .buttonStyle(.plain)
             }
         }
         .sheet(isPresented: $showQuestsExpanded) {
@@ -128,22 +233,57 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Background
-    private var backgroundGradient: some View {
-        ZStack {
-            Color(uiColor: .systemBackground)
+    // MARK: - Quick Actions
 
-            LinearGradient(
-                colors: [
-                    Color.blue.opacity(0.08),
-                    Color.purple.opacity(0.05),
-                    Color.clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+    private var quickActionsSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Nova.Spacing.sm) {
+                if let lastId = settings.lastSubjectId,
+                   let subject = Subject(rawValue: lastId) {
+                    QuickActionChip(
+                        title: "Continuar",
+                        subtitle: subject.displayName,
+                        icon: subject.icon,
+                        color: subject.color,
+                        hint: "Toca dos veces para continuar estudiando \(subject.displayName)"
+                    ) {
+                        selectedSubject = subject
+                    }
+                    .matchedTransitionSource(id: subject.id, in: transitionNamespace)
+                    .opacity(chipsAppeared ? 1 : 0)
+                    .offset(y: chipsAppeared ? 0 : 20)
+                    .animation(Nova.Animation.stagger(index: 0), value: chipsAppeared)
+                }
+
+                QuickActionChip(
+                    title: "Chat libre",
+                    subtitle: "Pregunta lo que quieras",
+                    icon: "bubble.left.and.bubble.right.fill",
+                    color: .purple,
+                    hint: "Toca dos veces para iniciar un chat libre"
+                ) {
+                    selectedSubject = .open
+                }
+                .opacity(chipsAppeared ? 1 : 0)
+                .offset(y: chipsAppeared ? 0 : 20)
+                .animation(Nova.Animation.stagger(index: 1), value: chipsAppeared)
+
+                QuickActionChip(
+                    title: "Meta diaria",
+                    subtitle: settings.dailyGoalMinutes == 0 ? "Sin meta" : "\(settings.dailyGoalMinutes) min",
+                    icon: "target",
+                    color: .orange,
+                    hint: "Toca dos veces para configurar tu meta de estudio"
+                ) {
+                    showingGoalSheet = true
+                }
+                .opacity(chipsAppeared ? 1 : 0)
+                .offset(y: chipsAppeared ? 0 : 20)
+                .animation(Nova.Animation.stagger(index: 2), value: chipsAppeared)
+            }
+            .padding(.horizontal, Nova.Spacing.screenHorizontal)
+            .onAppear { chipsAppeared = true }
         }
-        .ignoresSafeArea()
         .sheet(isPresented: $showingGoalSheet) {
             GoalEditView(settings: settings)
                 .presentationDetents([.height(350)])
@@ -151,114 +291,13 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Header Section
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center, spacing: 16) {
-                // Logo with glow effect
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 70, height: 70)
-                        .blur(radius: 10)
-
-                    Image("AppLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(greeting),")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-
-                    Text(settings.studentName)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.primary, .primary.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                }
-
-                Spacer()
-            }
-
-            Text("Que quieres aprender hoy?")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-    }
-
-    // MARK: - Quick Actions
-    private var quickActionsSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                if let lastId = settings.lastSubjectId,
-                   let subject = Subject(rawValue: lastId) {
-                    QuickActionCard(
-                        title: "Continuar",
-                        subtitle: subject.displayName,
-                        icon: subject.icon, // Use subject icon or play
-                        gradient: [subject.color, subject.color.opacity(0.8)]
-                    ) {
-                        selectedSubject = subject
-                    }
-                } else {
-                    QuickActionCard(
-                        title: "Empezar",
-                        subtitle: "Matemáticas",
-                        icon: "play.fill",
-                        gradient: [.blue, .cyan]
-                    ) {
-                        selectedSubject = .math
-                    }
-                }
-
-                QuickActionCard(
-                    title: "Chat libre",
-                    subtitle: "Pregunta lo que quieras",
-                    icon: "bubble.left.and.bubble.right.fill",
-                    gradient: [.purple, .pink]
-                ) {
-                    selectedSubject = .open
-                }
-
-                QuickActionCard(
-                    title: "Meta diaria",
-                    subtitle: settings.dailyGoalMinutes == 0 ? "Sin meta" : "\(settings.dailyGoalMinutes) min",
-                    icon: "target",
-                    gradient: [.orange, .red]
-                ) {
-                    // Show goal setting sheet
-                    showingGoalSheet = true
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-
     // MARK: - Subjects Section
+
     private var subjectsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Nova.Spacing.md) {
             HStack {
                 Text("Materias")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title2.bold())
 
                 Spacer()
 
@@ -266,83 +305,66 @@ struct HomeView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, Nova.Spacing.screenHorizontal)
 
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(Subject.allCases) { subject in
+            LazyVGrid(columns: columns, spacing: Nova.Spacing.lg) {
+                ForEach(Array(Subject.allCases.enumerated()), id: \.element.id) { index, subject in
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(Nova.Animation.entranceFast) {
                             selectedSubject = subject
                         }
                     } label: {
                         SubjectCard(subject: subject)
                     }
-                    .buttonStyle(SubjectButtonStyle())
+                    .buttonStyle(.squishy)
+                    .matchedTransitionSource(id: subject.id, in: transitionNamespace)
+                    .opacity(cardsAppeared ? 1 : 0)
+                    .offset(y: cardsAppeared ? 0 : 20)
+                    .animation(Nova.Animation.stagger(index: index), value: cardsAppeared)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, Nova.Spacing.screenHorizontal)
+            .onAppear { cardsAppeared = true }
         }
     }
 }
 
-// MARK: - Quick Action Card
-struct QuickActionCard: View {
+// MARK: - Quick Action Chip
+
+struct QuickActionChip: View {
     let title: String
     let subtitle: String
     let icon: String
-    let gradient: [Color]
+    let color: Color
+    var hint: String = ""
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: gradient,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 44, height: 44)
+            HStack(spacing: Nova.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(color)
 
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
 
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, Nova.Spacing.md)
+            .padding(.vertical, Nova.Spacing.sm)
+            .glassEffect(.regular.interactive(), in: Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.squishy)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(subtitle)")
+        .accessibilityHint(hint)
     }
-}
-
-// MARK: - Subject Button Style
-struct SubjectButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
-    }
-}
-
-#Preview {
-    HomeView(selectedSubject: .constant(nil), settings: UserSettings())
-        .modelContainer(for: [UserSettings.self, DailyQuest.self, DailyActivity.self], inMemory: true)
 }
 
 // MARK: - Streak Badge
@@ -351,23 +373,23 @@ struct StreakBadge: View {
     let days: Int
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Nova.Spacing.xxs) {
             Image(systemName: "flame.fill")
-                .font(.subheadline)
+                .font(.caption.bold())
                 .foregroundStyle(.orange)
-                .symbolEffect(.bounce, value: days)
 
             Text("\(days)")
-                .font(.subheadline.bold())
-                .foregroundStyle(.primary)
+                .font(.caption.bold())
 
             Text(days == 1 ? "día" : "días")
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.horizontal, Nova.Spacing.sm)
+        .padding(.vertical, Nova.Spacing.xs)
+        .glassEffect(.regular, in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Racha de \(days) \(days == 1 ? "día" : "días")")
     }
 }
 
@@ -378,18 +400,17 @@ struct QuestsDetailSheet: View {
     let modelContext: ModelContext
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showXPGain = false
-    @State private var lastXPGained = 0
     @State private var showLevelUp = false
-    @State private var newLevel = 0
+    @State private var newLevel = 1
+    @State private var previousLevel = 0
     @State private var newTitle = ""
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: Nova.Spacing.xl) {
                     // Header
-                    VStack(spacing: 8) {
+                    VStack(spacing: Nova.Spacing.sm) {
                         Image(systemName: "target")
                             .font(.largeTitle)
                             .foregroundStyle(.blue)
@@ -432,24 +453,10 @@ struct QuestsDetailSheet: View {
                     }
                 }
             }
-            .overlay {
-                // XP Toast
-                if showXPGain {
-                    VStack {
-                        XPGainToast(
-                            amount: lastXPGained,
-                            multiplier: XPManager.shared.currentMultiplier
-                        )
-                        .padding()
-                        .transition(.move(edge: .top).combined(with: .opacity))
-
-                        Spacer()
-                    }
-                }
-            }
             .fullScreenCover(isPresented: $showLevelUp) {
                 LevelUpCelebration(
                     newLevel: newLevel,
+                    previousLevel: previousLevel,
                     newTitle: newTitle,
                     onDismiss: {
                         showLevelUp = false
@@ -464,28 +471,19 @@ struct QuestsDetailSheet: View {
 
         let result = DailyQuestService.shared.completeQuest(quest, context: modelContext)
 
-        // Update local state
         if let index = quests.firstIndex(where: { $0.id == quest.id }) {
             quests[index] = quest
         }
 
-        // Show XP feedback
-        lastXPGained = result.xpGained
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            showXPGain = true
-        }
+        IslandNotificationManager.shared.show(
+            .xpGain(amount: result.xpGained, multiplier: XPManager.shared.currentMultiplier)
+        )
 
-        // Hide after delay
-        Task {
-            try? await Task.sleep(for: .seconds(2.5))
-            withAnimation {
-                showXPGain = false
-            }
-        }
-
-        // Level up celebration
         if result.leveledUp {
-            newLevel = XPManager.shared.newLevel
+            let level = XPManager.shared.newLevel
+            guard level > 0 else { return }
+            previousLevel = XPManager.shared.previousLevel
+            newLevel = level
             newTitle = PlayerLevel.title(forLevel: newLevel)
 
             Task {
@@ -497,82 +495,103 @@ struct QuestsDetailSheet: View {
 }
 
 // MARK: - Goal Edit View
+
 struct GoalEditView: View {
     @Bindable var settings: UserSettings
     @Environment(\.dismiss) var dismiss
+    @ScaledMetric(relativeTo: .largeTitle) private var goalFontSize: CGFloat = 64
 
     var body: some View {
-        VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
+        VStack(spacing: Nova.Spacing.xxl) {
+            VStack(spacing: Nova.Spacing.sm) {
                 Text("Meta Diaria")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
+                    .font(.title2.bold())
+
                 Text("Establece tu objetivo de estudio diario")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .padding(.top, 24)
+            .padding(.top, Nova.Spacing.xxl)
 
-            // Goal Display
-            VStack(spacing: 8) {
+            VStack(spacing: Nova.Spacing.sm) {
                 Text("\(settings.dailyGoalMinutes)")
-                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                    .font(.system(size: goalFontSize, weight: .bold, design: .rounded))
                     .foregroundStyle(.blue)
-                
+
                 Text("minutos")
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Meta diaria")
+            .accessibilityValue("\(settings.dailyGoalMinutes) minutos")
 
-            // Controls
-            HStack(spacing: 32) {
+            HStack(spacing: Nova.Spacing.xxxl) {
                 Button {
                     if settings.dailyGoalMinutes > 5 {
                         settings.dailyGoalMinutes -= 5
-                        triggerHaptic()
+                        Nova.Haptics.medium()
                     }
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 44))
-                        .foregroundStyle(.gray.opacity(0.3))
+                        .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel("Reducir meta")
+                .accessibilityHint("Reduce la meta en 5 minutos")
 
                 Button {
                     if settings.dailyGoalMinutes < 240 {
                         settings.dailyGoalMinutes += 5
-                        triggerHaptic()
+                        Nova.Haptics.medium()
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 44))
                         .foregroundStyle(.blue)
                 }
+                .accessibilityLabel("Aumentar meta")
+                .accessibilityHint("Aumenta la meta en 5 minutos")
             }
 
             Spacer()
 
-            // Save Button
             Button {
                 dismiss()
             } label: {
                 Text("Listo")
                     .font(.headline)
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
-                    .cornerRadius(16)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, Nova.Spacing.screenHorizontal)
+            .padding(.bottom, Nova.Spacing.screenHorizontal)
         }
+        .background(Color(.systemBackground))
     }
+}
 
-    private func triggerHaptic() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+// MARK: - Scroll Offset Preference Key
+
+private struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
+}
+
+// MARK: - Preview
+
+struct HomeView_Preview_Wrapper: View {
+    @Namespace var namespace
+
+    var body: some View {
+        HomeView(selectedSubject: .constant(nil), settings: UserSettings(), transitionNamespace: namespace)
+            .modelContainer(for: [UserSettings.self, DailyQuest.self, DailyActivity.self], inMemory: true)
+    }
+}
+
+#Preview {
+    HomeView_Preview_Wrapper()
 }

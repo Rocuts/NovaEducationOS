@@ -3,6 +3,8 @@ import Foundation
 
 @Model
 final class StudySession {
+    #Index<StudySession>([\.startTime], [\.subjectId])
+
     var id: UUID
     var startTime: Date
     var endTime: Date

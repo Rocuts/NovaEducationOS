@@ -10,6 +10,9 @@ struct ChatView: View {
     @Query private var settingsArray: [UserSettings]
     @State private var sessionStartTime: Date?
     @State private var showingModelUnavailableAlert = false
+    @State private var showVoiceMode = false
+    @Environment(FocusManager.self) private var focusManager
+    @Namespace private var inputGlassNamespace
 
     private var settings: UserSettings? {
         settingsArray.first
@@ -46,7 +49,7 @@ struct ChatView: View {
                     state: viewModel.imageGenerationState,
                     subjectColor: subject.color
                 )
-                .animation(.spring(response: 0.4), value: viewModel.imageGenerationState.isActive)
+                .animation(Nova.Animation.springDefault, value: viewModel.imageGenerationState.isActive)
 
                 // Messages
                 messagesScrollView
@@ -69,42 +72,62 @@ struct ChatView: View {
                 // Custom Liquid Glass Header
                 ChatHeaderView(
                     subject: subject,
+                    isThinking: viewModel.isGenerating,
+                    isListening: speechService.isRecording,
+                    audioLevel: speechService.audioLevel,
                     onBack: {
                         dismiss()
                     },
                     onDelete: {
                         textToSpeechService.stop()
                         viewModel.clearHistory(context: modelContext, messages: history)
+                    },
+                    onVoiceMode: {
+                        showVoiceMode = true
                     }
                 )
             }
 
-            // XP Gain Toast Overlay
-            if viewModel.showXPToast {
+            // Focus Phase Indicator (se muestra durante modo focus)
+            if focusManager.isFocusModeActive && focusManager.currentPhase != .idle {
                 VStack {
-                    XPGainToast(
-                        amount: viewModel.lastXPGained,
-                        multiplier: viewModel.lastMultiplier
-                    )
-                    .padding(.horizontal)
-                    .padding(.top, 100) // Below header
-
                     Spacer()
+                    HStack {
+                        FocusPhaseIndicator(
+                            phase: focusManager.currentPhase,
+                            sessionMinutes: focusManager.focusMinutes
+                        )
+                        Spacer()
+                    }
+                    .padding(.horizontal, Nova.Spacing.lg)
+                    .padding(.bottom, 80)
                 }
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(100)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(Nova.Animation.entranceMedium, value: focusManager.currentPhase)
+                .allowsHitTesting(false)
+                .zIndex(50)
+            }
+
+            // Particle Explosion for big XP gains or Level Up
+            if viewModel.showParticleExplosion {
+                ParticleExplosionView(color: subject.color)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea()
+                    .zIndex(99)
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.showXPToast)
-        .navigationBarHidden(true)
+        .animation(Nova.Animation.springDefault, value: viewModel.showParticleExplosion)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             startSession()
             configureSessionWithStudentData()
+            focusManager.startTimer()
         }
         .onDisappear {
             textToSpeechService.stop()
             viewModel.stopGenerating()
             endSession()
+            focusManager.stopTimer()
         }
         .alert("Apple Intelligence no disponible", isPresented: $showingModelUnavailableAlert) {
             Button("Entendido", role: .cancel) { }
@@ -114,22 +137,48 @@ struct ChatView: View {
         .fullScreenCover(isPresented: $viewModel.showLevelUpCelebration) {
             LevelUpCelebration(
                 newLevel: viewModel.newLevel,
+                previousLevel: viewModel.previousLevel,
                 newTitle: viewModel.newTitle,
                 onDismiss: {
                     viewModel.dismissLevelUpCelebration()
                 }
             )
         }
+        .fullScreenCover(isPresented: $showVoiceMode) {
+            VoiceModeView()
+        }
+        .onChange(of: viewModel.errorMessage) { _, newValue in
+            if newValue != nil {
+                // Trigger alert or showing mechanism
+            }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.dismissError() } }
+        )) {
+            Button("OK", role: .cancel) { }
+            if let _ = viewModel.errorRecoverySuggestion {
+                Button("Reintentar") {
+                    viewModel.sendMessage(context: modelContext, history: Array(history))
+                }
+            }
+        } message: {
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                if let suggestion = viewModel.errorRecoverySuggestion {
+                    Text("\n" + suggestion)
+                }
+            }
+        }
     }
-
     // MARK: - Model Unavailable Banner
     @ViewBuilder
     private func modelUnavailableBanner(reason: SystemLanguageModel.Availability.UnavailableReason) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Nova.Spacing.md) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Nova.Spacing.xxxs) {
                 Text("Modelo no disponible")
                     .font(.subheadline)
                     .fontWeight(.semibold)
@@ -151,8 +200,8 @@ struct ChatView: View {
                 .buttonStyle(.bordered)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Nova.Spacing.lg)
+        .padding(.vertical, Nova.Spacing.md)
         .background(.orange.opacity(0.1))
     }
 
@@ -171,14 +220,10 @@ struct ChatView: View {
 
     // MARK: - Background
     private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color(uiColor: .systemBackground),
-                subject.color.opacity(0.05),
-                Color(uiColor: .systemBackground)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
+        AuroraBackgroundView(
+            primaryColor: subject.color,
+            secondaryColor: subject.color.opacity(0.5),
+            intensity: 0.8
         )
         .ignoresSafeArea()
     }
@@ -187,7 +232,7 @@ struct ChatView: View {
     private var messagesScrollView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 16) {
+                LazyVStack(spacing: Nova.Spacing.lg) {
                     // Welcome message if empty
                     if history.isEmpty {
                         welcomeMessage
@@ -196,7 +241,8 @@ struct ChatView: View {
                     ForEach(history) { msg in
                         MessageBubble(
                             message: msg,
-                            isStreaming: viewModel.isGenerating && msg.id == history.last?.id && msg.role == .assistant
+                            isStreaming: viewModel.isGenerating && msg.id == history.last?.id && msg.role == .assistant,
+                            subjectColor: subject.color
                         )
                         .id(msg.id)
                     }
@@ -211,9 +257,9 @@ struct ChatView: View {
                             .id("thinking-bubble")
                     }
                 }
-                .animation(.spring(response: 0.4), value: viewModel.isGeneratingImage)
+                .animation(Nova.Animation.springDefault, value: viewModel.isGeneratingImage)
                 .padding()
-                .padding(.bottom, 20)
+                .padding(.bottom, Nova.Spacing.xl)
             }
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: history.count) {
@@ -232,23 +278,26 @@ struct ChatView: View {
 
     // MARK: - Welcome Message
     private var welcomeMessage: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(subject.color.opacity(0.2))
-                    .frame(width: 80, height: 80)
+        VStack(spacing: Nova.Spacing.lg) {
+            NovaAvatarView(state: .idle)
+                .frame(width: 115, height: 115)
+                .shadow(color: subject.color.opacity(0.2), radius: 25)
 
-                Image(systemName: subject.icon)
-                    .font(.system(size: 36))
-                    .foregroundStyle(subject.color)
-            }
+            VStack(spacing: Nova.Spacing.sm) {
+                if let name = settings?.studentName, name != "Estudiante", !name.isEmpty {
+                    Text("Hola \(name), bienvenido a \(subject.displayName)")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("Bienvenido a \(subject.displayName)")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                }
 
-            VStack(spacing: 8) {
-                Text("Bienvenido a \(subject.displayName)")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-
-                Text("Hazme cualquier pregunta sobre este tema y te ayudare a entenderlo mejor.")
+                Text("Soy Nova, tu tutora personal. Preguntame lo que necesites y te ayudare paso a paso.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -264,21 +313,21 @@ struct ChatView: View {
                 imageHints
             }
         }
-        .padding(.vertical, 40)
-        .padding(.horizontal, 20)
+        .padding(.vertical, Nova.Spacing.jumbo)
+        .padding(.horizontal, Nova.Spacing.screenHorizontal)
     }
 
     private var imageHints: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Nova.Spacing.sm) {
             if !subject.hasSpecialKeyboard {
                 Divider()
-                    .padding(.vertical, 8)
+                    .padding(.vertical, Nova.Spacing.sm)
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Nova.Spacing.sm) {
                 Image(systemName: "apple.image.playground")
                     .foregroundStyle(subject.color)
-                Text("Puedo generar imagenes para ayudarte a visualizar conceptos")
+                Text("Puedo generar imágenes para ayudarte a visualizar conceptos")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -286,22 +335,22 @@ struct ChatView: View {
     }
 
     private var featureHints: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Nova.Spacing.sm) {
             Divider()
-                .padding(.vertical, 8)
+                .padding(.vertical, Nova.Spacing.sm)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Nova.Spacing.sm) {
                 Image(systemName: "keyboard")
                     .foregroundStyle(subject.color)
-                Text("Usa el teclado de simbolos para escribir formulas")
+                Text("Usa el teclado de símbolos para escribir fórmulas")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Nova.Spacing.sm) {
                 Image(systemName: "function")
                     .foregroundStyle(subject.color)
-                Text("Nova puede mostrar formulas matematicas")
+                Text("Nova puede mostrar fórmulas matemáticas")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -321,143 +370,154 @@ struct ChatView: View {
 
     // MARK: - Input Area
     private var inputArea: some View {
-        HStack(spacing: 12) {
-            // Text Input / Recording Locked UI
-            if isRecordingLocked {
-                 // Locked Recording UI
-                 HStack {
-                     Button {
-                         cancelLockedRecording()
-                     } label: {
-                         Image(systemName: "trash")
-                             .font(.title2)
-                             .foregroundStyle(.red)
-                             .padding(8)
-                     }
-                     
-                     Spacer()
-                     
-                     Text(speechService.transcribedText.isEmpty ? "Grabando..." : speechService.transcribedText)
-                         .lineLimit(1)
-                         .foregroundStyle(.primary)
-                     
-                     Spacer()
-                     
-                     // Stop & Send Button
-                     Button {
-                         sendLockedRecording()
-                     } label: {
-                         Image(systemName: "arrow.up.circle.fill")
-                             .font(.system(size: 32))
-                             .foregroundStyle(subject.color)
-                     }
-                 }
-                 .padding(.horizontal, 16)
-                 .padding(.vertical, 8)
-                 .background(.ultraThinMaterial)
-                 .glassEffect(.regular, in: Capsule())
-                 .transition(.move(edge: .bottom).combined(with: .opacity))
-            } else {
-                // Standard UI (Original) with Lock Hint
-                HStack(spacing: 8) {
-                    if speechService.isRecording {
-                         // Recording UI
-                         HStack(spacing: 12) {
-                             Image(systemName: "mic.fill")
-                                 .symbolEffect(.pulse, isActive: true)
+        GlassEffectContainer(spacing: Nova.Spacing.md) {
+            HStack(spacing: Nova.Spacing.md) {
+                // Text Input / Recording Locked UI
+                if isRecordingLocked {
+                     // Locked Recording UI
+                     HStack {
+                         Button {
+                             cancelLockedRecording()
+                         } label: {
+                             Image(systemName: "trash")
+                                 .font(.title2)
                                  .foregroundStyle(.red)
-                             
-                             if isRecordingCancelled {
-                                 Text("Suelta para cancelar")
-                                     .foregroundStyle(.secondary)
-                                     .transition(.opacity)
-                             } else {
-                                 Text(speechService.transcribedText.isEmpty ? "Escuchando..." : speechService.transcribedText)
-                                     .foregroundStyle(.primary)
-                                     .lineLimit(1)
-                                     .transition(.opacity)
-                                 
-                                 Spacer()
-                                 
-                                 VStack(spacing: 16) {
-                                     // Lock Hint
-                                     HStack(spacing: 4) {
-                                        Image(systemName: "lock.open")
-                                            .font(.caption)
-                                        Text("Desliza arriba")
-                                            .font(.caption)
-                                     }
-                                     .foregroundStyle(.secondary)
-                                     .opacity(verticalDragOffset < -10 ? 1 : 0.5)
-                                     .offset(y: verticalDragOffset < -10 ? verticalDragOffset * 0.2 : 0)
-
-                                     // Cancel Hint
-                                     HStack(spacing: 4) {
-                                         Image(systemName: "chevron.left")
-                                             .font(.caption)
-                                         Text("Desliza para cancelar")
-                                             .font(.caption)
-                                     }
-                                     .foregroundStyle(.secondary)
-                                     .opacity(dragOffset < 0 ? 0.5 : 1)
-                                 }
-                                 .transition(.opacity)
-                             }
+                                 .padding(Nova.Spacing.sm)
                          }
-                    } else {
-                        // Standard Text Field
-                        TextField("Pregunta algo...", text: $viewModel.currentInput, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .lineLimit(1...5)
-                        
-                        if !viewModel.currentInput.isEmpty {
-                            Button {
-                                viewModel.currentInput = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
+                         .accessibilityLabel("Cancelar grabación")
+                         .accessibilityHint("Toca dos veces para cancelar la grabación de voz")
+
+                         Spacer()
+
+                         Text(speechService.transcribedText.isEmpty ? "Grabando..." : speechService.transcribedText)
+                             .lineLimit(1)
+                             .foregroundStyle(.primary)
+
+                         Spacer()
+
+                         // Stop & Send Button
+                         Button {
+                             sendLockedRecording()
+                         } label: {
+                             Image(systemName: "arrow.up.circle.fill")
+                                 .font(.system(size: 32))
+                                 .foregroundStyle(subject.color)
+                         }
+                         .accessibilityLabel("Enviar grabación")
+                         .accessibilityHint("Toca dos veces para enviar el mensaje de voz")
+                     }
+                     .padding(.horizontal, Nova.Spacing.lg)
+                     .padding(.vertical, Nova.Spacing.sm)
+                     .glassEffect(.regular, in: Capsule())
+                     .glassEffectID("inputField", in: inputGlassNamespace)
+                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else {
+                    // Standard UI (Original) with Lock Hint
+                    HStack(spacing: Nova.Spacing.sm) {
+                        if speechService.isRecording {
+                             // Recording UI
+                             HStack(spacing: Nova.Spacing.md) {
+                                 Image(systemName: "mic.fill")
+                                     .symbolEffect(.pulse, isActive: true)
+                                     .foregroundStyle(.red)
+
+                                 if isRecordingCancelled {
+                                     Text("Suelta para cancelar")
+                                         .foregroundStyle(.secondary)
+                                         .transition(.opacity)
+                                 } else {
+                                     Text(speechService.transcribedText.isEmpty ? "Escuchando..." : speechService.transcribedText)
+                                         .foregroundStyle(.primary)
+                                         .lineLimit(1)
+                                         .transition(.opacity)
+
+                                     Spacer()
+
+                                     VStack(spacing: Nova.Spacing.lg) {
+                                         // Lock Hint
+                                         HStack(spacing: Nova.Spacing.xxs) {
+                                            Image(systemName: "lock.open")
+                                                .font(.caption)
+                                            Text("Desliza arriba")
+                                                .font(.caption)
+                                         }
+                                         .foregroundStyle(.secondary)
+                                         .opacity(verticalDragOffset < -10 ? 1 : 0.5)
+                                         .offset(y: verticalDragOffset < -10 ? verticalDragOffset * 0.2 : 0)
+
+                                         // Cancel Hint
+                                         HStack(spacing: Nova.Spacing.xxs) {
+                                             Image(systemName: "chevron.left")
+                                                 .font(.caption)
+                                             Text("Desliza para cancelar")
+                                                 .font(.caption)
+                                         }
+                                         .foregroundStyle(.secondary)
+                                         .opacity(dragOffset < 0 ? 0.5 : 1)
+                                     }
+                                     .transition(.opacity)
+                                 }
+                             }
+                        } else {
+                            // Standard Text Field
+                            TextField("Pregunta algo...", text: $viewModel.currentInput, axis: .vertical)
+                                .textFieldStyle(.plain)
+                                .lineLimit(1...5)
+
+                            if !viewModel.currentInput.isEmpty {
+                                Button {
+                                    viewModel.currentInput = ""
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .accessibilityLabel("Borrar texto")
+                                .accessibilityHint("Toca dos veces para limpiar el campo de texto")
                             }
                         }
                     }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .glassEffect(.regular, in: Capsule())
-                .animation(.spring(response: 0.3), value: speechService.isRecording)
-                .animation(.spring(response: 0.3), value: isRecordingCancelled)
-                
-                // Mic / Send Button
-                if !isRecordingLocked {
-                    ZStack {
-                        // Send Button (Visible when text exists and not recording)
-                        if canSend && !speechService.isRecording {
-                            Button {
-                                sendMessage()
-                            } label: {
-                                Circle()
-                                    .fill(subject.color)
-                                    .frame(width: 44, height: 44)
-                                    .overlay {
-                                        Image(systemName: "arrow.up")
-                                            .font(.system(size: 16, weight: .bold))
-                                            .foregroundStyle(.white)
-                                    }
-                            }
-                            .transition(.scale.combined(with: .opacity))
-                        }
-                        
-                        // Mic Button (Visible when no text or recording)
-                        if !canSend || speechService.isRecording {
-                            micButton
+                    .padding(.horizontal, Nova.Spacing.lg)
+                    .padding(.vertical, Nova.Spacing.md)
+                    .glassEffect(.regular, in: Capsule())
+                    .glassEffectID("inputField", in: inputGlassNamespace)
+                    .animation(Nova.Animation.springSnappy, value: speechService.isRecording)
+                    .animation(Nova.Animation.springSnappy, value: isRecordingCancelled)
+
+                    // Mic / Send Button
+                    if !isRecordingLocked {
+                        ZStack {
+                            // Send Button (Visible when text exists and not recording)
+                            if canSend && !speechService.isRecording {
+                                Button {
+                                    sendMessage()
+                                } label: {
+                                    Circle()
+                                        .fill(subject.color)
+                                        .frame(width: 44, height: 44)
+                                        .overlay {
+                                            Image(systemName: "arrow.up")
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundStyle(.white)
+                                        }
+                                }
+                                .accessibilityLabel("Enviar mensaje")
+                                .accessibilityHint("Toca dos veces para enviar tu mensaje")
                                 .transition(.scale.combined(with: .opacity))
+                            }
+
+                            // Mic Button (Visible when no text or recording)
+                            if !canSend || speechService.isRecording {
+                                micButton
+                                    .transition(.scale.combined(with: .opacity))
+                            }
                         }
+                        .glassEffectID("actionButton", in: inputGlassNamespace)
                     }
                 }
             }
+            .padding(.horizontal, Nova.Spacing.lg)
+            .padding(.vertical, Nova.Spacing.md)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
     }
 
     private var micButton: some View {
@@ -475,7 +535,7 @@ struct ChatView: View {
                         .foregroundStyle(.primary)
                         .offset(y: -50 + verticalDragOffset) // Moves with drag
                         .opacity(verticalDragOffset < -20 ? 1 : 0)
-                        .animation(.spring, value: verticalDragOffset)
+                        .animation(Nova.Animation.springDefault, value: verticalDragOffset)
                 }
 
                 // Mic Icon
@@ -498,6 +558,19 @@ struct ChatView: View {
             )
         }
         .frame(width: 44, height: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Grabar mensaje de voz")
+        .accessibilityHint("Toca dos veces para grabar un mensaje de voz. Toca dos veces y mantén para grabar continuamente.")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            if speechService.isRecording {
+                speechService.stopRecording()
+                processAndSendRecording()
+                resetRecordingState()
+            } else {
+                startRecording()
+            }
+        }
     }
 
     private func handleDragChanged(_ value: DragGesture.Value) {
@@ -519,8 +592,7 @@ struct ChatView: View {
                     isRecordingCancelled = false
                 }
                 // Haptic Lock
-                let generator = UIImpactFeedbackGenerator(style: .heavy)
-                generator.impactOccurred()
+                Nova.Haptics.heavy()
                 return
             }
 
@@ -553,8 +625,7 @@ struct ChatView: View {
             verticalDragOffset = 0
             try speechService.startRecording()
             // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
+            Nova.Haptics.medium()
         } catch {
             print("Error recording: \(error)")
         }
@@ -566,8 +637,7 @@ struct ChatView: View {
         if isRecordingCancelled {
             // Cancelled
             print("Recording cancelled")
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
+            Nova.Haptics.error()
         } else {
             // Success: Send
             processAndSendRecording()
@@ -600,8 +670,7 @@ struct ChatView: View {
              // Auto-Send
              sendMessage()
              
-             let generator = UINotificationFeedbackGenerator()
-             generator.notificationOccurred(.success)
+             Nova.Haptics.success()
         }
     }
     
@@ -620,6 +689,9 @@ struct ChatView: View {
     }
 
     private func sendMessage() {
+        // Record focus message for session stats
+        focusManager.recordFocusMessage()
+
         // Check model availability first
         guard modelAvailability == .available else {
             showingModelUnavailableAlert = true
@@ -632,14 +704,14 @@ struct ChatView: View {
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
         if let last = history.last {
-            withAnimation(.easeOut(duration: 0.3)) {
+            withAnimation(Nova.Animation.exitMedium) {
                 proxy.scrollTo(last.id, anchor: .bottom)
             }
         }
     }
 
     private func scrollToThinkingBubble(proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(Nova.Animation.exitMedium) {
             proxy.scrollTo("thinking-bubble", anchor: .bottom)
         }
     }
@@ -652,8 +724,8 @@ struct ChatView: View {
         let studentName = settings?.studentName ?? "Estudiante"
         let educationLevel = settings?.educationLevel ?? .secondary
 
-        // Recreate the ViewModel with actual student data
-        // This ensures the Foundation Model session has the correct adaptive prompt
+        // TODO: Replacing the entire ViewModel loses any in-flight state. Consider adding
+        // a reconfigure(studentName:educationLevel:) method to ChatViewModel instead.
         viewModel = ChatViewModel(
             subject: subject,
             studentName: studentName,
@@ -669,20 +741,13 @@ struct ChatView: View {
     // MARK: - Tracking Logic
     private func startSession() {
         sessionStartTime = Date()
-
-        // Update Daily Activity
-        let today = Calendar.current.startOfDay(for: Date())
-        let descriptor = FetchDescriptor<DailyActivity>(predicate: #Predicate { $0.date == today })
-
-        if (try? modelContext.fetch(descriptor).first) != nil {
-            // Already active today
-        } else {
-            let newActivity = DailyActivity(date: Date(), wasActive: true)
-            modelContext.insert(newActivity)
+        
+        // Capture container to create a background context
+        let container = modelContext.container
+        
+        Task.detached(priority: .userInitiated) {
+            await BackgroundSessionManager.shared.initializeSession(container: container)
         }
-
-        // Initialize achievements if needed
-        AchievementManager.shared.initializeAchievements(context: modelContext)
     }
 
     private func endSession() {

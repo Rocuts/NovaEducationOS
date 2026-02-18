@@ -1,8 +1,12 @@
 import Speech
 import SwiftUI
 import Observation
+import os
+
+private let logger = Logger(subsystem: "com.nova.education", category: "SpeechRecognition")
 
 @Observable
+@MainActor
 class SpeechRecognitionService {
     var isRecording = false
     var transcribedText = ""
@@ -10,11 +14,13 @@ class SpeechRecognitionService {
     var errorMessage: String?
     
     // Private properties
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "es-ES"))
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale.autoupdatingCurrent)
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
     
+    var audioLevel: Float = 0.0
+
     init() {
         requestPermission()
     }
@@ -40,10 +46,10 @@ class SpeechRecognitionService {
             recognitionTask = nil
         }
         
-        // Configure Audio Session
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        // Configure Audio Session - MANAGED BY VoiceModeManager
+        // let audioSession = AVAudioSession.sharedInstance()
+        // try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP])
+        // try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         
         // Create Request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -59,9 +65,11 @@ class SpeechRecognitionService {
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        // Install Tap
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            recognitionRequest.append(buffer)
+        // Install Tap - capture recognitionRequest locally to avoid accessing @MainActor state from audio thread
+        let request = recognitionRequest
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            request.append(buffer)
+            self?.updateAudioLevel(buffer: buffer)
         }
         
         // Start Engine
@@ -82,7 +90,9 @@ class SpeechRecognitionService {
             }
             
             if error != nil || isFinal {
-                self.stopRecordingInternal()
+                Task { @MainActor in
+                    self.stopRecordingInternal()
+                }
             }
         }
         
@@ -105,5 +115,22 @@ class SpeechRecognitionService {
         // We don't cancel the task here immediately if we want the final result,
         // but for a smooth UI toggle, we consider recording 'done'.
         isRecording = false
+    }
+    
+    nonisolated private func updateAudioLevel(buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData?[0] else { return }
+        let frames = Int(buffer.frameLength)
+
+        var sum: Float = 0.0
+        for i in 0..<frames {
+            let sample = channelData[i]
+            sum += sample * sample
+        }
+        let rms = sqrt(sum / Float(frames))
+        let normalized = min(rms * 5.0, 1.0)
+
+        Task { @MainActor in
+            self.audioLevel = normalized
+        }
     }
 }

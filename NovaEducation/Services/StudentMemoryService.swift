@@ -99,11 +99,44 @@ final class StudentMemoryService {
     }
 
     /// Builds a context string for the AI with relevant student knowledge
+    /// Uses a single fetch + in-memory filtering instead of 5 separate queries
     func buildKnowledgeContext(for subjectId: String, context: ModelContext) -> String {
-        let concepts = getKnowledge(for: subjectId, category: .concept, context: context).prefix(5)
-        let difficulties = getDifficulties(for: subjectId, context: context).prefix(3)
-        let strengths = getKnowledge(for: subjectId, category: .strength, context: context).prefix(3)
-        let interests = getInterests(context: context).prefix(3)
+        // Single fetch: all knowledge for this subject
+        let subjectDescriptor = FetchDescriptor<StudentKnowledge>(
+            predicate: #Predicate { $0.subjectId == subjectId },
+            sortBy: [SortDescriptor(\.lastReviewedAt, order: .reverse)]
+        )
+        let subjectKnowledge = (try? context.fetch(subjectDescriptor)) ?? []
+
+        // In-memory categorization (O(n) single pass)
+        var concepts: [StudentKnowledge] = []
+        var difficulties: [StudentKnowledge] = []
+        var strengths: [StudentKnowledge] = []
+
+        for k in subjectKnowledge {
+            switch k.category {
+            case .concept where concepts.count < 5:
+                concepts.append(k)
+            case .difficulty, .misconception:
+                if difficulties.count < 3 {
+                    difficulties.append(k)
+                }
+            case .strength where strengths.count < 3:
+                strengths.append(k)
+            default:
+                break
+            }
+        }
+
+        // Separate fetch for interests (cross-subject)
+        let interestCategory = KnowledgeCategory.interest
+        let interestDescriptor = FetchDescriptor<StudentKnowledge>(
+            predicate: #Predicate { $0.category == interestCategory },
+            sortBy: [SortDescriptor(\.timesReferenced, order: .reverse)]
+        )
+        var interestFetch = interestDescriptor
+        interestFetch.fetchLimit = 3
+        let interests = (try? context.fetch(interestFetch)) ?? []
 
         var parts: [String] = []
 
