@@ -5,7 +5,7 @@ import SwiftData
 // MARK: - Memory Store Tool
 
 /// Tool that allows the AI to store information about the student's learning
-final class MemoryStoreTool: Tool, @unchecked Sendable {
+struct MemoryStoreTool: Tool {
     let name = "storeStudentKnowledge"
     let includesSchemaInInstructions = false
 
@@ -25,18 +25,21 @@ final class MemoryStoreTool: Tool, @unchecked Sendable {
         let masteryLevel: Double
     }
 
-    /// Set once from @MainActor before any call() invocation. Read in call() via MainActor.run.
-    nonisolated(unsafe) var onStoreKnowledge: ((String, KnowledgeCategory, Double) -> Void)?
+    var onStoreKnowledge: (@Sendable (String, KnowledgeCategory, Double) -> Void)?
 
     /// Current subject ID (set by FoundationModelService)
-    nonisolated(unsafe) var currentSubjectId: String = "open"
+    var currentSubjectId: String = "open"
 
     func call(arguments: Arguments) async throws -> String {
         let category = KnowledgeCategory(rawValue: arguments.category) ?? .concept
         let mastery = max(0, min(1, arguments.masteryLevel))
 
+        let safeKnowledge = String(arguments.knowledge.prefix(500))
+            .replacingOccurrences(of: "[", with: "(")
+            .replacingOccurrences(of: "]", with: ")")
+
         await MainActor.run {
-            onStoreKnowledge?(arguments.knowledge, category, mastery)
+            onStoreKnowledge?(safeKnowledge, category, mastery)
         }
 
         return "Stored."
@@ -46,7 +49,7 @@ final class MemoryStoreTool: Tool, @unchecked Sendable {
 // MARK: - Memory Recall Tool
 
 /// Tool that allows the AI to retrieve stored information about the student
-final class MemoryRecallTool: Tool, @unchecked Sendable {
+struct MemoryRecallTool: Tool {
     let name = "recallStudentKnowledge"
     let includesSchemaInInstructions = false
 
@@ -63,8 +66,7 @@ final class MemoryRecallTool: Tool, @unchecked Sendable {
         let topic: String?
     }
 
-    /// Set once from @MainActor before any call() invocation. Read in call() via MainActor.run.
-    nonisolated(unsafe) var onRecallKnowledge: (@MainActor (String, String?) -> String)?
+    var onRecallKnowledge: (@Sendable @MainActor (String, String?) -> String)?
 
     func call(arguments: Arguments) async throws -> String {
         guard let callback = onRecallKnowledge else {
@@ -82,7 +84,7 @@ final class MemoryRecallTool: Tool, @unchecked Sendable {
 // MARK: - Quiz Generator Tool
 
 /// Tool that allows the AI to generate quiz questions to evaluate the student
-final class QuizGeneratorTool: Tool, @unchecked Sendable {
+struct QuizGeneratorTool: Tool {
     let name = "generateQuizQuestion"
     let includesSchemaInInstructions = false
 
@@ -111,19 +113,24 @@ final class QuizGeneratorTool: Tool, @unchecked Sendable {
         let difficulty: String
     }
 
-    /// Set once from @MainActor before any call() invocation. Read in call() via MainActor.run.
-    nonisolated(unsafe) var onQuizGenerated: ((String, [String], String, String, String, QuizDifficulty) -> Void)?
+    var onQuizGenerated: (@Sendable (String, [String], String, String, String, QuizDifficulty) -> Void)?
 
     func call(arguments: Arguments) async throws -> String {
         let difficulty = QuizDifficulty(rawValue: arguments.difficulty) ?? .medium
 
+        let safeOptions = Array(arguments.options.prefix(4)).map { String($0.prefix(200)) }
+        let safeExplanation = String(arguments.explanation.prefix(500))
+        let safeQuestion = String(arguments.question.prefix(500))
+        let safeCorrect = String(arguments.correctAnswer.prefix(200))
+        let safeConcept = String(arguments.relatedConcept.prefix(200))
+
         await MainActor.run {
             onQuizGenerated?(
-                arguments.question,
-                arguments.options,
-                arguments.correctAnswer,
-                arguments.explanation,
-                arguments.relatedConcept,
+                safeQuestion,
+                safeOptions,
+                safeCorrect,
+                safeExplanation,
+                safeConcept,
                 difficulty
             )
         }

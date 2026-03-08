@@ -8,6 +8,8 @@ struct MarkdownTextView: View {
     let isUser: Bool
 
     @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .body) private var inlineMathFontSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .title3) private var displayMathFontSize: CGFloat = 20
 
     init(content: String, isUser: Bool = false) {
         self.content = content
@@ -24,7 +26,7 @@ struct MarkdownTextView: View {
                 case .mathInline(let latex):
                     MathView(
                         latex: latex,
-                        fontSize: 18,
+                        fontSize: inlineMathFontSize,
                         textColor: textColor,
                         displayStyle: false
                     )
@@ -32,7 +34,7 @@ struct MarkdownTextView: View {
                 case .mathBlock(let latex):
                     MathView(
                         latex: latex,
-                        fontSize: 20,
+                        fontSize: displayMathFontSize,
                         textColor: textColor,
                         displayStyle: true
                     )

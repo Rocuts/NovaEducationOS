@@ -1,0 +1,2 @@
+Successfully loaded. Root node children count: 1
+Bounding box: min SCNVector3(x: -1.3022336959838867, y: -0.4844880700111389, z: -0.5), max SCNVector3(x: 1.3022334575653076, y: 0.5155119299888611, z: 0.4999997615814209)

@@ -177,27 +177,32 @@ enum RenderPreset: String, Codable, Sendable {
     case cell, dna
     case heart, lung, eye, brain
     case flower, tree, leaf
+    case microscope, fossil
     // Geography
-    case volcano, mountain
-    // Physics
+    case volcano, mountain, compass
+    // Astronomy
+    case telescope, blackHole, rocket
+    // Physics / Electronics
     case pendulum, magnet, wave
+    case prism, battery
     // Chemistry
     case crystal, chemicalBond
 
     var defaultPrimitive: RenderPrimitive {
         switch self {
         case .atom, .molecule, .waterMolecule, .earth, .mars, .jupiter, .moon, .sun, .star,
-             .eye, .cell, .solarSystem, .saturn, .heart, .lung, .brain, .flower, .tree, .leaf:
+             .eye, .cell, .solarSystem, .saturn, .heart, .lung, .brain, .flower, .tree, .leaf,
+             .blackHole:
             return .sphere
-        case .dna, .pendulum, .chemicalBond:
+        case .dna, .pendulum, .chemicalBond, .telescope, .microscope, .rocket, .battery, .compass:
             return .cylinder
         case .crystal:
             return .cube
-        case .volcano, .mountain:
+        case .volcano, .mountain, .prism:
             return .cone
         case .magnet:
             return .capsule
-        case .wave:
+        case .wave, .fossil:
             return .torus
         }
     }
@@ -225,6 +230,14 @@ enum RenderPreset: String, Codable, Sendable {
         case .wave: return .blue
         case .crystal: return .cyan
         case .chemicalBond: return .blue
+        case .microscope: return .silver
+        case .telescope: return .black
+        case .compass: return .gold
+        case .prism: return .white
+        case .blackHole: return .black
+        case .rocket: return .white
+        case .fossil: return .brown
+        case .battery: return .green
         }
     }
 
@@ -271,6 +284,14 @@ enum RenderPreset: String, Codable, Sendable {
         case .wave: return "Onda"
         case .crystal: return "Cristal"
         case .chemicalBond: return "Enlace químico"
+        case .microscope: return "Microscopio"
+        case .telescope: return "Telescopio"
+        case .compass: return "Brújula"
+        case .prism: return "Prisma"
+        case .blackHole: return "Agujero Negro"
+        case .rocket: return "Cohete"
+        case .fossil: return "Fósil"
+        case .battery: return "Batería"
         }
     }
 
@@ -303,6 +324,14 @@ enum RenderPreset: String, Codable, Sendable {
         case .wave: return "Wave diagram wavelength amplitude"
         case .crystal: return "Crystal lattice structure"
         case .chemicalBond: return "Chemical bond atoms sharing electrons"
+        case .microscope: return "Microscope science instrument"
+        case .telescope: return "Telescope astronomy observatory"
+        case .compass: return "Magnetic compass with needle pointing north"
+        case .prism: return "Glass prism refracting rainbow light spectrum"
+        case .blackHole: return "Black hole with accretion disk space"
+        case .rocket: return "Space rocket launching into space"
+        case .fossil: return "Ammonite fossil embedded in rock"
+        case .battery: return "Battery with positive and negative terminals"
         }
     }
 }
@@ -365,16 +394,18 @@ struct RenderOutput: Sendable {
         let pan: Bool
     }
 
-    /// Fallback output when everything fails
-    static let fallback = RenderOutput(
-        assetId: UUID().uuidString,
-        spokenSummary: "Te muestro una figura 3D. ¿Qué forma quieres exactamente?",
-        renderMode: .object3d,
-        controlsEnabled: .init(rotate: true, zoom: true, pan: true),
-        attachmentType: "geometry_3d",
-        attachmentData: "{\"shape\":\"cube\",\"color\":\"blue\",\"scale\":1.0,\"animation\":\"rotate\",\"caption\":\"\"}",
-        imageURL: nil
-    )
+    /// Fallback output when everything fails — computed so each call gets a unique assetId
+    static var fallback: RenderOutput {
+        RenderOutput(
+            assetId: UUID().uuidString,
+            spokenSummary: "Te muestro una figura 3D. ¿Qué forma quieres exactamente?",
+            renderMode: .object3d,
+            controlsEnabled: .init(rotate: true, zoom: true, pan: true),
+            attachmentType: "geometry_3d",
+            attachmentData: "{\"shape\":\"cube\",\"color\":\"blue\",\"scale\":1.0,\"animation\":\"rotate\",\"caption\":\"\"}",
+            imageURL: nil
+        )
+    }
 }
 
 // MARK: - LLM Extraction Type (guided generation)

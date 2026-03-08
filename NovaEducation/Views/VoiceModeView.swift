@@ -123,7 +123,6 @@ struct VoiceModeView: View {
                         .foregroundStyle(primaryTextStyle)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Nova.Spacing.jumbo)
-                        .padding(.bottom, 60)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .id("MainTranscript")
                 }
@@ -137,9 +136,9 @@ struct VoiceModeView: View {
                         .padding()
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: Nova.Radius.sm))
-                        .padding(.bottom, 60)
                 }
             }
+            .safeAreaPadding(.bottom, Nova.Spacing.xl)
         }
         .onChange(of: voiceManager.currentTranscript) { _, newValue in
             if !newValue.isEmpty {

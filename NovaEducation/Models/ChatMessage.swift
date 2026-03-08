@@ -10,7 +10,7 @@ enum MessageRole: String, Codable {
 class ChatMessage {
     #Index<ChatMessage>([\.subjectId, \.timestamp])
 
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var role: MessageRole
     var content: String
     var timestamp: Date

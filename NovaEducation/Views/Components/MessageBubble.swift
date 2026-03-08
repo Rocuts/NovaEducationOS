@@ -39,6 +39,8 @@ struct MessageBubble: View {
 
             if !isUser { Spacer(minLength: 60) }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(isUser ? "Tu mensaje" : "Mensaje del tutor")
     }
 
     // MARK: - Assistant Avatar

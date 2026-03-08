@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import FoundationModels
 
 @Observable
 @MainActor
@@ -12,9 +13,9 @@ class ChatViewModel {
     private var currentTask: Task<Void, Never>?
     private var xpToastDismissTask: Task<Void, Never>?
 
-    /// Student profile for adaptive prompts
-    private let studentName: String
-    private let educationLevel: EducationLevel
+    private var studentName: String
+    private var educationLevel: EducationLevel
+    private var lastFailedPrompt: String?
 
     // MARK: - Gamification State
 
@@ -51,16 +52,33 @@ class ChatViewModel {
     /// Si debemos mostrar celebración de level up
     var showLevelUpCelebration: Bool = false
 
-    /// Exposes image generation state from the model service
-    var imageGenerationState: ImageGenerationState {
-        modelService.imageGenerationState
+    var currentIdentity: (studentName: String, educationLevel: EducationLevel) {
+        (studentName, educationLevel)
     }
 
     init(subject: Subject, studentName: String = "Estudiante", educationLevel: EducationLevel = .secondary) {
         self.subject = subject
         self.studentName = studentName
         self.educationLevel = educationLevel
-        // Session will be created when modelContext is set
+    // Session will be created when modelContext is set
+    }
+
+    /// Reconfigures the ViewModel with new student data without dropping in-flight state
+    func reconfigure(studentName: String, educationLevel: EducationLevel) {
+        // Only trigger a reconfiguration if the data actually changed
+        if self.studentName != studentName || self.educationLevel != educationLevel {
+            self.studentName = studentName
+            self.educationLevel = educationLevel
+
+            // Re-create the session on the service with the new identity context,
+            // but don't reset other fields on this ViewModel.
+            modelService.createSession(
+                for: subject,
+                studentName: studentName,
+                educationLevel: educationLevel,
+                forceRecreate: true
+            )
+        }
     }
 
     /// Sets the model context for SwiftData operations (call this before using the ViewModel)
@@ -74,8 +92,11 @@ class ChatViewModel {
         if modelService.modelContext == nil {
             modelService.modelContext = context
         }
-        let trimmed = currentInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        let rawTrimmed = currentInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawTrimmed.isEmpty else { return }
+
+        // Cap message length to prevent excessive input
+        let trimmed = String(rawTrimmed.prefix(4000))
 
         // Limpiar error previo al enviar nuevo mensaje
         dismissError()
@@ -87,12 +108,232 @@ class ChatViewModel {
             return
         }
 
+        // Re-check model availability right before dispatching generation.
+        if modelService.availability != .available {
+            self.errorMessage = "Apple Intelligence no está disponible en este momento."
+            self.errorRecoverySuggestion = "Activa Apple Intelligence en Configuración o espera a que el modelo termine de prepararse."
+            return
+        }
+
+        // Nuevo ciclo de envío: limpiar prompt fallido previo
+        lastFailedPrompt = nil
+
         let userMsg = ChatMessage(role: .user, content: trimmed, subjectId: subject.id)
         context.insert(userMsg)
 
         currentInput = ""
 
+        // Three-way deterministic routing — "App decide, LLM enseña"
+
+        // 1. Render intent (visual: 3D models, images)
+        let routerResult = RenderIntentRouter.detect(trimmed)
+        if routerResult.hasRenderIntent {
+            generateRenderResponse(for: userMsg, routerResult: routerResult, context: context, history: history)
+            return
+        }
+
+        // 2. Subject interceptor (computation, facts, grammar)
+        if let interceptor = SubjectIntentRouter.detect(trimmed, subject: subject) {
+            generateInterceptedResponse(for: userMsg, interceptor: interceptor, context: context, history: history)
+            return
+        }
+
+        // 3. Pure LLM (discussion, creative, open-ended)
         generateResponse(for: userMsg, context: context, history: history)
+    }
+
+    // MARK: - Render Pipeline Response
+
+    /// Handles messages identified as render intents.
+    /// Flow: RenderPipeline produces asset → teacher explains → message gets both.
+    private func generateRenderResponse(
+        for userMessage: ChatMessage,
+        routerResult: RouterResult,
+        context: ModelContext,
+        history: [ChatMessage]
+    ) {
+        let assistantMsg = ChatMessage(role: .assistant, content: "", subjectId: subject.id)
+        context.insert(assistantMsg)
+
+        isGenerating = true
+
+        let previousTask = currentTask
+        previousTask?.cancel()
+        currentTask = Task {
+            _ = await previousTask?.value
+            // 1. Execute render pipeline (deterministic + optional LLM extraction)
+            let renderOutput = await RenderPipeline.shared.process(
+                text: userMessage.content,
+                routerResult: routerResult
+            )
+            if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                return
+            }
+
+            // 2. Attach render result to message
+            assistantMsg.attachmentType = renderOutput.attachmentType
+            assistantMsg.attachmentData = renderOutput.attachmentData
+            if let imageURL = renderOutput.imageURL {
+                assistantMsg.imageURL = imageURL
+            }
+
+            // 3. Stream teacher response about the rendered content
+            // The app already rendered the 3D model — tell teacher to explain only
+            let teacherPrompt = """
+            [El estudiante pidió ver "\(userMessage.content)" y la app ya le mostró un modelo 3D interactivo: \(renderOutput.spokenSummary)]
+            Explica el concepto educativo de forma breve y clara. El modelo 3D ya es visible para el estudiante. Solo enseña sobre el tema.
+            """
+
+            do {
+                let stream = modelService.streamResponse(
+                    prompt: teacherPrompt,
+                    history: history,
+                    interactionMode: .text
+                )
+                var parts: [String] = []
+                var flushCounter = 0
+                for try await delta in stream {
+                    guard !Task.isCancelled else { break }
+                    parts.append(delta)
+                    flushCounter += 1
+                    if flushCounter % 4 == 0 {
+                        assistantMsg.content = parts.joined()
+                    }
+                }
+                assistantMsg.content = parts.joined()
+
+                // Cleanup tool artifacts from teacher response
+                assistantMsg.content = assistantMsg.content
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                    return
+                }
+            } catch {
+                if Task.isCancelled || error is CancellationError {
+                    self.finishCancelledGeneration(assistantMsg: assistantMsg, context: context)
+                    return
+                }
+                // Teacher failed — use spoken summary as fallback text
+                if assistantMsg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    assistantMsg.content = renderOutput.spokenSummary
+                }
+            }
+
+            if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                return
+            }
+
+            // Ensure message is never empty
+            if assistantMsg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                assistantMsg.content = renderOutput.spokenSummary
+            }
+
+            isGenerating = false
+            awardMessageXP(context: context)
+        }
+    }
+
+    // MARK: - Interceptor Pipeline Response
+
+    /// Handles messages intercepted by a SubjectInterceptor.
+    /// Flow: Interceptor.solve() computes answer → teacher LLM explains → message gets both.
+    private func generateInterceptedResponse(
+        for userMessage: ChatMessage,
+        interceptor: any SubjectInterceptor,
+        context: ModelContext,
+        history: [ChatMessage]
+    ) {
+        let assistantMsg = ChatMessage(role: .assistant, content: "", subjectId: subject.id)
+        context.insert(assistantMsg)
+
+        isGenerating = true
+
+        let previousTask = currentTask
+        previousTask?.cancel()
+        currentTask = Task {
+            _ = await previousTask?.value
+            let start = ContinuousClock.now
+
+            // 1. Execute interceptor (deterministic, fast)
+            let result = await interceptor.solve(userMessage.content, subject: subject)
+            if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                return
+            }
+
+            let elapsed = start.duration(to: .now)
+            let durationMs = Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+                + Int(elapsed.components.seconds) * 1000
+
+            // 2. Log metrics
+            InterceptorMetrics.log(
+                utterance: userMessage.content,
+                subject: subject.id,
+                interceptorId: interceptor.interceptorId,
+                result: result,
+                durationMs: durationMs
+            )
+
+            // 3. If fallthrough, delegate to pure LLM path
+            if result.category == .passthrough {
+                isGenerating = false
+                context.delete(assistantMsg)
+                generateResponse(for: userMessage, context: context, history: history)
+                return
+            }
+
+            // 4. Attach interceptor data to message
+            assistantMsg.attachmentType = result.attachmentType
+            assistantMsg.attachmentData = result.attachmentData
+
+            // 5. Stream teacher response — LLM explains, never recomputes
+            let teacherPrompt = "[RESULTADO: \(result.answer)] \(result.teacherInstruction)"
+
+            do {
+                let stream = modelService.streamResponse(
+                    prompt: teacherPrompt,
+                    history: history,
+                    interactionMode: .text
+                )
+                var parts: [String] = []
+                var flushCounter = 0
+                for try await delta in stream {
+                    guard !Task.isCancelled else { break }
+                    parts.append(delta)
+                    flushCounter += 1
+                    if flushCounter % 4 == 0 {
+                        assistantMsg.content = parts.joined()
+                    }
+                }
+                assistantMsg.content = parts.joined()
+
+                assistantMsg.content = assistantMsg.content
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                    return
+                }
+            } catch {
+                if Task.isCancelled || error is CancellationError {
+                    self.finishCancelledGeneration(assistantMsg: assistantMsg, context: context)
+                    return
+                }
+                // Teacher failed — use computed answer as fallback
+                if assistantMsg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    assistantMsg.content = result.answer
+                }
+            }
+
+            if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                return
+            }
+
+            // Ensure message is never empty
+            if assistantMsg.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                assistantMsg.content = result.answer
+            }
+
+            isGenerating = false
+            awardMessageXP(context: context)
+        }
     }
 
     private func generateResponse(for userMessage: ChatMessage, context: ModelContext, history: [ChatMessage]) {
@@ -102,59 +343,91 @@ class ChatViewModel {
         isGenerating = true
 
         // Cancel previous generation to prevent race conditions
-        currentTask?.cancel()
+        let previousTask = currentTask
+        previousTask?.cancel()
         currentTask = Task {
+            _ = await previousTask?.value
             var responseSuccessful = false
 
             do {
-                let stream = modelService.streamResponse(prompt: userMessage.content, history: history)
+                let stream = modelService.streamResponse(
+                    prompt: userMessage.content,
+                    history: history,
+                    interactionMode: .text
+                )
 
+                var parts: [String] = []
+                var flushCounter = 0
                 for try await delta in stream {
                     guard !Task.isCancelled else { break }
-                    assistantMsg.content += delta
+                    parts.append(delta)
+                    flushCounter += 1
+                    if flushCounter % 4 == 0 {
+                        assistantMsg.content = parts.joined()
+                    }
+                }
+                assistantMsg.content = parts.joined()
+                if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                    return
                 }
 
-                // Check if an image was generated via Tool Calling
-                // Check if an image was generated via Tool Calling
-                if let imageURL = modelService.generatedImageURL {
+                // Associate generated image if the ImageGeneratorTool produced one during streaming.
+                // The tool callback sets generatedImageURL on FoundationModelService.
+                if let imageURL = self.modelService.state.image.generatedImageURL {
                     assistantMsg.imageURL = imageURL
-                    modelService.resetImageState()
-                }
-                
-                // Check if an interactive attachment was generated via Tool Calling
-                if let attachment = modelService.generatedAttachment {
-                    assistantMsg.attachmentType = attachment.type
-                    assistantMsg.attachmentData = attachment.data
+                    self.modelService.state.image.generatedImageURL = nil
+                    self.modelService.state.image.status = .idle
                 }
 
-                // Cleanup common placeholder text unconditionally
-                // (The model might hallucinate this text even if the tool wasn't called or failed)
-                let placeholders = [
-                    "[Generated Educational Image]",
-                    "[Imagen generada]",
-                    "[Generating image for educational illustration]",
-                    "[Generando imagen para ilustración educativa]",
-                    "Generando imagen...",
-                    "Generating image...",
-                    "Aquí tienes una imagen...",
-                    "Aquí tienes una ilustración...",
-                    "Aquí hay una imagen...",
-                    "He generado una imagen...",
-                    "generateEducationalImage",
-                    "null",
-                    "[]",
-                    "{}"
-                ]
-
-                var cleanContent = assistantMsg.content
-                for placeholder in placeholders {
-                    cleanContent = cleanContent.replacingOccurrences(of: placeholder, with: "")
+                assistantMsg.content = assistantMsg.content
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                    return
                 }
-                assistantMsg.content = cleanContent.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                // Defense in depth: if the model returned a useless rejection response,
+                // retry once with a simplified prompt that avoids confusion.
+                if FoundationModelService.isUselessResponse(assistantMsg.content) {
+                    assistantMsg.content = ""
+                    let retryPrompt = "Responde esta pregunta de \(subject.displayName): \(userMessage.content)"
+                    let retryStream = modelService.streamResponse(
+                        prompt: retryPrompt,
+                        history: [],
+                        interactionMode: .text
+                    )
+                    var retryParts: [String] = []
+                    var retryFlushCounter = 0
+                    for try await delta in retryStream {
+                        guard !Task.isCancelled else { break }
+                        retryParts.append(delta)
+                        retryFlushCounter += 1
+                        if retryFlushCounter % 4 == 0 {
+                            assistantMsg.content = retryParts.joined()
+                        }
+                    }
+                    assistantMsg.content = retryParts.joined()
+                    assistantMsg.content = assistantMsg.content
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if self.finishCancelledGenerationIfNeeded(assistantMsg: assistantMsg, context: context) {
+                        return
+                    }
+
+                    // If retry also failed, use a hardcoded fallback
+                    if FoundationModelService.isUselessResponse(assistantMsg.content) || assistantMsg.content.isEmpty {
+                        assistantMsg.content = generateFallbackResponse(for: userMessage.content)
+                    }
+                }
 
                 responseSuccessful = !assistantMsg.content.isEmpty
 
             } catch {
+                if Task.isCancelled || error is CancellationError {
+                    self.finishCancelledGeneration(assistantMsg: assistantMsg, context: context)
+                    return
+                }
+
+                recordFailedPrompt(userMessage.content)
+
                 if assistantMsg.content.isEmpty {
                     // Eliminar mensaje vacío y mostrar error como estado separado
                     context.delete(assistantMsg)
@@ -162,8 +435,13 @@ class ChatViewModel {
                     self.errorMessage = novaError?.errorDescription ?? "Lo siento, hubo un error al generar la respuesta. Por favor intenta de nuevo."
                     self.errorRecoverySuggestion = novaError?.recoverySuggestion
                 } else {
-                    // Respuesta parcial recibida — no agregar error crudo al contenido
-                    self.errorMessage = "La respuesta se interrumpió. Puedes intentar de nuevo."
+                    // Respuesta parcial recibida
+                    if let novaError = error as? NovaError, case .repetitionDetected = novaError {
+                        self.errorMessage = novaError.errorDescription
+                        self.errorRecoverySuggestion = novaError.recoverySuggestion
+                    } else {
+                        self.errorMessage = "La respuesta se interrumpió. Puedes intentar de nuevo."
+                    }
                 }
             }
 
@@ -176,19 +454,19 @@ class ChatViewModel {
         }
     }
 
+    /// Last-resort fallback when the model refuses to answer. Returns a helpful
+    /// response that encourages the student to rephrase their question.
+    private func generateFallbackResponse(for input: String) -> String {
+        let subjectName = subject.displayName
+        return "Vamos a resolver esto juntos, \(studentName). ¿Podrías reformular tu pregunta sobre \(subjectName)? Así puedo darte una mejor explicación."
+    }
+
     // MARK: - Gamification Methods
 
     /// Otorga XP por enviar un mensaje
     private func awardMessageXP(context: ModelContext) {
-        // Determinar si es el primer mensaje del día
-        let startOfDay = Calendar.current.startOfDay(for: Date())
-        let descriptor = FetchDescriptor<XPTransaction>(
-            predicate: #Predicate { $0.timestamp >= startOfDay && $0.sourceRaw == "message" }
-        )
-        let messagesCountToday = (try? context.fetchCount(descriptor)) ?? 0
-
-        // Primer mensaje del día tiene bonus
-        let source: XPSource = messagesCountToday == 0 ? .firstOfDay : .message
+        let messagesCountToday = Self.messageTransactionCountToday(in: context)
+        let source = Self.xpSourceForMessageCount(messagesCountToday)
 
         // Otorgar XP
         let result = XPManager.shared.awardXP(
@@ -249,6 +527,16 @@ class ChatViewModel {
         errorRecoverySuggestion = nil
     }
 
+    func retryLastFailedMessage(context: ModelContext, history: [ChatMessage] = []) {
+        guard let failedPrompt = lastFailedPrompt?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !failedPrompt.isEmpty else {
+            return
+        }
+        currentInput = failedPrompt
+        sendMessage(context: context, history: history)
+    }
+
     func stopGenerating() {
         currentTask?.cancel()
         modelService.cancel()
@@ -273,8 +561,43 @@ class ChatViewModel {
         modelService.createSession(for: subject, studentName: studentName, educationLevel: educationLevel, forceRecreate: true)
     }
 
-    /// Whether image generation is currently in progress
-    var isGeneratingImage: Bool {
-        imageGenerationState.isActive
+    static func messageTransactionCountToday(
+        in context: ModelContext,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Int {
+        let startOfDay = calendar.startOfDay(for: now)
+        let descriptor = FetchDescriptor<XPTransaction>(
+            predicate: #Predicate {
+                $0.timestamp >= startOfDay
+                    && ($0.sourceRaw == "message" || $0.sourceRaw == "first_of_day")
+            }
+        )
+        return (try? context.fetchCount(descriptor)) ?? 0
+    }
+
+    static func xpSourceForMessageCount(_ messagesCountToday: Int) -> XPSource {
+        messagesCountToday == 0 ? .firstOfDay : .message
+    }
+
+    private func recordFailedPrompt(_ prompt: String) {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        lastFailedPrompt = trimmed
+    }
+
+    @discardableResult
+    private func finishCancelledGenerationIfNeeded(assistantMsg: ChatMessage, context: ModelContext) -> Bool {
+        guard Task.isCancelled else { return false }
+        finishCancelledGeneration(assistantMsg: assistantMsg, context: context)
+        return true
+    }
+
+    private func finishCancelledGeneration(assistantMsg: ChatMessage, context: ModelContext) {
+        assistantMsg.content = assistantMsg.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if assistantMsg.content.isEmpty {
+            context.delete(assistantMsg)
+        }
+        isGenerating = false
     }
 }

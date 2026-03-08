@@ -1,0 +1,9 @@
+Successfully loaded. Root node children count: 1
+Node Eye_1_R_aiStandard3_0 has geometry with 1 materials
+  Material: aiStandard3 - Lighting Model: SCNLightingModelPhysicallyBased
+  - diffuse: Display P3 Linear colorspace hdrm(1) 0 0 0 1
+  - emission: Display P3 Linear colorspace hdrm(1) 0 0 0 1
+Node Eye_2_R_Eyes_0 has geometry with 1 materials
+  Material: Eyes - Lighting Model: SCNLightingModelPhysicallyBased
+  - diffuse: file:///Users/rocuts/Documents/GitHub/NovaEducation/NovaEducation/Resources/Models/eye.usdz?offset=147392&size=337535
+  - emission: Display P3 Linear colorspace hdrm(1) 0 0 0 1

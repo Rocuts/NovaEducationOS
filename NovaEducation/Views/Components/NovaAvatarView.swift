@@ -182,12 +182,40 @@ struct NovaAvatarView: View {
                             y: NovaAnchors.speechBubbleApprox.center.y * scale
                         )
 
-                    // MARK: — Book (bottom layer)
-                    // Anchor: NovaAnchors.book (239,687)-(784,912)
-                    BookShape()
+                    // MARK: — Book Cover (Backing/Bottom layer) (bottom layer)
+                    BookBottomCoverShape()
                         .fill(mintFill)
                         .overlay(
-                            BookShape()
+                            BookBottomCoverShape()
+                                .stroke(outlineBlue, style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
+                        )
+                        .frame(
+                            width: NovaAnchors.book.size.width * scale,
+                            height: NovaAnchors.book.size.height * scale
+                        )
+                        .position(
+                            x: NovaAnchors.book.center.x * scale,
+                            y: NovaAnchors.book.center.y * scale
+                        )
+                    
+                    // MARK: — Book Stack Pages (Top Tier Detail)
+                    BookStackLinesShape()
+                        .stroke(outlineBlue, style: StrokeStyle(lineWidth: strokeWidth * 0.4, lineCap: .round, lineJoin: .round))
+                        .frame(
+                            width: NovaAnchors.book.size.width * scale,
+                            height: NovaAnchors.book.size.height * scale
+                        )
+                        .position(
+                            x: NovaAnchors.book.center.x * scale,
+                            y: NovaAnchors.book.center.y * scale
+                        )
+                    
+                    // MARK: — Book Pages (top layer)
+                    // Anchor: NovaAnchors.book (239,687)-(784,912)
+                    BookTopPagesShape()
+                        .fill(mintFill)
+                        .overlay(
+                            BookTopPagesShape()
                                 .stroke(outlineBlue, style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
                         )
                         .frame(
@@ -628,13 +656,11 @@ struct NovaAvatarView: View {
 
 // MARK: - 1:1 Shapes (geometry preserved from original)
 
-/// Full graduation cap: diamond mortarboard + cap crown/band + tassel.
-/// Design space: 481×169, all coordinates proportional.
 struct GraduationHat1to1View: View {
-    var baseColor: Color      // hatTeal #31708F — cap crown/band
-    var highlightColor: Color  // hatHighlight #367392 — mortarboard diamond
-    var outlineColor: Color   // outlineBlue #0B4060 — outlines
-    var tasselFillColor: Color // mintFill #ACE6DA — tassel block fill
+    var baseColor: Color
+    var highlightColor: Color // Kept for API compatibility, though base color is used for mortarboard
+    var outlineColor: Color
+    var tasselFillColor: Color
     var strokeWidth: CGFloat
 
     var body: some View {
@@ -642,57 +668,59 @@ struct GraduationHat1to1View: View {
             let w = size.width
             let h = size.height
             let sw = strokeWidth
-
-            // --- 1. Cap Crown/Band (behind mortarboard) ---
-            // Trapezoidal band, extends to full height so it overlaps the bubble top.
-            // Frame is 481×219 (169+50 extension). Band fills bottom 75%.
-            var band = Path()
-            band.move(to: CGPoint(x: w * 0.22, y: h * 0.25))
-            band.addLine(to: CGPoint(x: w * 0.78, y: h * 0.25))
-            band.addLine(to: CGPoint(x: w * 0.76, y: h * 0.98))
-            band.addQuadCurve(
-                to: CGPoint(x: w * 0.24, y: h * 0.98),
-                control: CGPoint(x: w * 0.50, y: h * 1.03)
-            )
-            band.closeSubpath()
-            context.fill(band, with: .color(baseColor))
-            context.stroke(band, with: .color(outlineColor),
+            
+            // 1. Cap Base (skull cap) - matches outline color conceptually
+            var base = Path()
+            // Upper corners tuck under the mortarboard
+            base.move(to: CGPoint(x: w * 0.35, y: h * 0.45))
+            base.addLine(to: CGPoint(x: w * 0.65, y: h * 0.45))
+            // Sides taper down
+            base.addLine(to: CGPoint(x: w * 0.58, y: h * 0.7))
+            // Bottom edge curves slightly to sit on bubble
+            base.addQuadCurve(to: CGPoint(x: w * 0.42, y: h * 0.7), control: CGPoint(x: w * 0.5, y: h * 0.75))
+            base.closeSubpath()
+            
+            context.fill(base, with: .color(outlineColor))
+            context.stroke(base, with: .color(outlineColor),
                           style: StrokeStyle(lineWidth: sw, lineCap: .round, lineJoin: .round))
 
-            // --- 2. Mortarboard Diamond ---
-            // Flat ratio (~4:1). Adjusted for 219-tall frame (169+50 extension).
-            // Center at ~29% so diamond sits in upper portion, leaving band visible below.
+            // 2. Mortarboard Diamond
             var diamond = Path()
-            diamond.move(to: CGPoint(x: w * 0.500, y: h * 0.02))   // Top
-            diamond.addLine(to: CGPoint(x: w * 0.977, y: h * 0.29)) // Right
-            diamond.addLine(to: CGPoint(x: w * 0.500, y: h * 0.56)) // Bottom
-            diamond.addLine(to: CGPoint(x: w * 0.021, y: h * 0.29)) // Left
+            diamond.move(to: CGPoint(x: w * 0.5, y: h * 0.05)) // Top (higher)
+            diamond.addQuadCurve(to: CGPoint(x: w * 0.98, y: h * 0.35), control: CGPoint(x: w * 0.75, y: h * 0.15)) // Right (wider)
+            diamond.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.65), control: CGPoint(x: w * 0.75, y: h * 0.55)) // Bottom (lower)
+            diamond.addQuadCurve(to: CGPoint(x: w * 0.02, y: h * 0.35), control: CGPoint(x: w * 0.25, y: h * 0.55)) // Left (wider)
+            diamond.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.05), control: CGPoint(x: w * 0.25, y: h * 0.15)) // Top
             diamond.closeSubpath()
-            context.fill(diamond, with: .color(highlightColor))
+            
+            context.fill(diamond, with: .color(baseColor))
             context.stroke(diamond, with: .color(outlineColor),
                           style: StrokeStyle(lineWidth: sw, lineCap: .round, lineJoin: .round))
 
-            // --- 3. Tassel (cord + block, right side) ---
-            // Cord from diamond's right vertex area, hanging alongside the band
-            var cord = Path()
-            cord.move(to: CGPoint(x: w * 0.87, y: h * 0.29))
-            cord.addQuadCurve(
-                to: CGPoint(x: w * 0.89, y: h * 0.65),
-                control: CGPoint(x: w * 0.91, y: h * 0.45)
-            )
-            context.stroke(cord, with: .color(outlineColor),
-                          style: StrokeStyle(lineWidth: sw * 0.8, lineCap: .round))
+            // 3. Tassel String
+            var tassel = Path()
+            tassel.move(to: CGPoint(x: w * 0.5, y: h * 0.35)) // From center
+            // Falls almost straight down then slightly right to dangle
+            tassel.addQuadCurve(to: CGPoint(x: w * 0.78, y: h * 0.65), control: CGPoint(x: w * 0.65, y: h * 0.5))
+            context.stroke(tassel, with: .color(outlineColor),
+                          style: StrokeStyle(lineWidth: sw * 0.7, lineCap: .round, lineJoin: .round))
+            
+            // 4. Center button
+            let buttonPath = Path(ellipseIn: CGRect(x: w * 0.46, y: h * 0.31, width: w * 0.08, height: h * 0.08))
+            context.fill(buttonPath, with: .color(outlineColor))
 
-            // Tassel block (rounded rectangle at cord end)
-            let blockW = w * 0.07
-            let blockH = h * 0.14
-            let blockRect = CGRect(
-                x: w * 0.89 - blockW / 2,
-                y: h * 0.63,
-                width: blockW,
-                height: blockH
+            // 5. Tassel brush (triangle shape like in logo)
+            var block = Path()
+            let brushTop = CGPoint(x: w * 0.78, y: h * 0.65)
+            block.move(to: brushTop)
+            block.addLine(to: CGPoint(x: brushTop.x + w * 0.05, y: brushTop.y + h * 0.2)) // Right corner
+            // Slight curve on bottom of brush
+            block.addQuadCurve(
+                to: CGPoint(x: brushTop.x - w * 0.03, y: brushTop.y + h * 0.2), // Left corner
+                control: CGPoint(x: brushTop.x + w * 0.01, y: brushTop.y + h * 0.22)
             )
-            let block = Path(roundedRect: blockRect, cornerRadius: min(blockW, blockH) * 0.25)
+            block.closeSubpath()
+            
             context.fill(block, with: .color(tasselFillColor))
             context.stroke(block, with: .color(outlineColor),
                           style: StrokeStyle(lineWidth: sw * 0.8, lineCap: .round, lineJoin: .round))
@@ -702,67 +730,152 @@ struct GraduationHat1to1View: View {
 
 struct SpeechBubble1to1Shape: Shape {
     func path(in rect: CGRect) -> Path {
-        // Design space: 545×424. All constants proportional to that.
         let w = rect.width
         let h = rect.height
-        let cr = w * (90.0 / 545)           // cornerRadius (rounder to match PNG)
-        let tail = h * (38.0 / 424)         // tail inset from bottom (smaller to match PNG)
-
+        let cr = w * 0.12 // Smooth proportional corners matching logo
+        let tailHeight = h * 0.16
+        let bubbleB = h - tailHeight
+        
+        let leftWallX = w * 0.05
+        let rightWallX = w * 0.95
+        
         var path = Path()
-
-        // Main Rounded Rect with tail on bottom-left
-        path.move(to: CGPoint(x: cr, y: 0))
-        path.addLine(to: CGPoint(x: w - cr, y: 0))
-        path.addArc(center: CGPoint(x: w - cr, y: cr), radius: cr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
-        path.addLine(to: CGPoint(x: w, y: h - cr - tail))
-        path.addArc(center: CGPoint(x: w - cr, y: h - cr - tail), radius: cr, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
-
-        // Tail (connects to book)
-        path.addLine(to: CGPoint(x: w * (180.0 / 545), y: h - tail))
+        
+        // Start top left after corner
+        path.move(to: CGPoint(x: leftWallX + cr, y: 0))
+        path.addLine(to: CGPoint(x: rightWallX - cr, y: 0))
+        path.addArc(center: CGPoint(x: rightWallX - cr, y: cr), radius: cr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        
+        path.addLine(to: CGPoint(x: rightWallX, y: bubbleB - cr))
+        path.addArc(center: CGPoint(x: rightWallX - cr, y: bubbleB - cr), radius: cr, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        
+        // Bottom edge heading left
+        let tailRightX = leftWallX + cr * 2.0
+        path.addLine(to: CGPoint(x: tailRightX, y: bubbleB))
+        
+        // Curve sweeping down to tail tip
+        let tailTip = CGPoint(x: 0, y: bubbleB + tailHeight * 0.8) // Tip hits left edge
         path.addQuadCurve(
-            to: CGPoint(x: w * (80.0 / 545), y: h),
-            control: CGPoint(x: w * (120.0 / 545), y: h)
+            to: tailTip,
+            control: CGPoint(x: tailRightX - cr * 0.8, y: bubbleB + tailHeight * 0.2)
         )
-        path.addQuadCurve(
-            to: CGPoint(x: w * (100.0 / 545), y: h - tail),
-            control: CGPoint(x: w * (80.0 / 545), y: h - h * (40.0 / 424))
-        )
-
-        path.addLine(to: CGPoint(x: cr, y: h - tail))
-        path.addArc(center: CGPoint(x: cr, y: h - cr - tail), radius: cr, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
-
-        path.addLine(to: CGPoint(x: 0, y: cr))
-        path.addArc(center: CGPoint(x: cr, y: cr), radius: cr, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
-
+        
+        // Straight line cleanly back up to left wall
+        let leftWallJoinY = bubbleB - cr * 0.3
+        path.addLine(to: CGPoint(x: leftWallX, y: leftWallJoinY))
+        
+        // Go back up left edge
+        path.addLine(to: CGPoint(x: leftWallX, y: cr))
+        path.addArc(center: CGPoint(x: leftWallX + cr, y: cr), radius: cr, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        
         path.closeSubpath()
         return path
     }
 }
 
-struct BookShape: Shape {
+struct BookTopPagesShape: Shape {
     func path(in rect: CGRect) -> Path {
-        // w: 545, h: 225
         let w = rect.width
         let h = rect.height
-
         var path = Path()
+        
+        let spineTop = CGPoint(x: w * 0.5, y: h * 0.15)
+        let spineBottom = CGPoint(x: w * 0.5, y: h * 0.55) // Much shallower, closer to the gap
+        
+        // Flatter top edges like the logo
+        let leftTip = CGPoint(x: w * 0.05, y: h * 0.35)
+        let rightTip = CGPoint(x: w * 0.95, y: h * 0.35)
+        
+        // Top edge Left
+        path.move(to: spineTop)
+        path.addQuadCurve(to: leftTip, control: CGPoint(x: w * 0.25, y: h * 0.02))
+        // Bottom edge Left
+        path.addQuadCurve(to: spineBottom, control: CGPoint(x: w * 0.25, y: h * 0.65))
+        path.addLine(to: spineTop)
+        
+        // Top edge Right
+        path.move(to: spineTop)
+        path.addQuadCurve(to: rightTip, control: CGPoint(x: w * 0.75, y: h * 0.02))
+        // Bottom edge Right
+        path.addQuadCurve(to: spineBottom, control: CGPoint(x: w * 0.75, y: h * 0.65))
+        path.addLine(to: spineTop)
+        
+        return path
+    }
+}
 
-        // Open book schematic
+struct BookStackLinesShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        
+        let leftTip = CGPoint(x: w * 0.05, y: h * 0.35)
+        let rightTip = CGPoint(x: w * 0.95, y: h * 0.35)
+        let topSpineBottom = CGPoint(x: w * 0.5, y: h * 0.55)
+        
+        let coverThickness = h * 0.16
+        let halfThick = coverThickness * 0.5
+        let baseControlY = h * 0.65
+        
+        // Single central page line
+        path.move(to: CGPoint(x: leftTip.x, y: leftTip.y + halfThick))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.5, y: topSpineBottom.y + halfThick),
+            control: CGPoint(x: w * 0.25, y: baseControlY + halfThick)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: rightTip.x, y: rightTip.y + halfThick),
+            control: CGPoint(x: w * 0.75, y: baseControlY + halfThick)
+        )
+        
+        // Center spine division straight down through the block
+        path.move(to: topSpineBottom)
+        path.addLine(to: CGPoint(x: w * 0.5, y: topSpineBottom.y + coverThickness))
+        
+        return path
+    }
+}
 
-        // Left Page
-        path.move(to: CGPoint(x: 0, y: h * 0.3))
-        path.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.4), control: CGPoint(x: w * 0.25, y: 0))
-        path.addLine(to: CGPoint(x: w * 0.5, y: h))
-        path.addQuadCurve(to: CGPoint(x: 0, y: h * 0.9), control: CGPoint(x: w * 0.25, y: h * 0.6))
+struct BookBottomCoverShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        
+        let leftTip = CGPoint(x: w * 0.05, y: h * 0.35)
+        let rightTip = CGPoint(x: w * 0.95, y: h * 0.35)
+        let topSpineBottom = CGPoint(x: w * 0.5, y: h * 0.55)
+        
+        let coverThickness = h * 0.16
+        let baseControlY = h * 0.65
+        
+        // Top boundary of the solid block (hugging underneath the top covers)
+        path.move(to: leftTip)
+        path.addQuadCurve(
+            to: topSpineBottom,
+            control: CGPoint(x: w * 0.25, y: baseControlY)
+        )
+        path.addQuadCurve(
+            to: rightTip,
+            control: CGPoint(x: w * 0.75, y: baseControlY)
+        )
+        
+        // Right side thickness outer edge
+        path.addLine(to: CGPoint(x: rightTip.x, y: rightTip.y + coverThickness))
+        
+        // Bottom edge strokes backwards to Left
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.5, y: topSpineBottom.y + coverThickness),
+            control: CGPoint(x: w * 0.75, y: baseControlY + coverThickness)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: leftTip.x, y: leftTip.y + coverThickness),
+            control: CGPoint(x: w * 0.25, y: baseControlY + coverThickness)
+        )
+        
+        // Close the subpath (returns up to leftTip)
         path.closeSubpath()
-
-        // Right Page
-        path.move(to: CGPoint(x: w * 0.5, y: h * 0.4))
-        path.addQuadCurve(to: CGPoint(x: w, y: h * 0.3), control: CGPoint(x: w * 0.75, y: 0))
-        path.addLine(to: CGPoint(x: w, y: h * 0.9))
-        path.addQuadCurve(to: CGPoint(x: w * 0.5, y: h), control: CGPoint(x: w * 0.75, y: h * 0.6))
-        path.closeSubpath()
-
         return path
     }
 }
@@ -890,61 +1003,46 @@ struct Mouth1to1Shape: Shape {
         let h = rect.height
         var path = Path()
 
-        // Standard start/end points for mouth (centered horizontally)
-        let padding: CGFloat = isThinking ? w * 0.3 : 0
-        let baseY = h * 0.35 // Position mouth line slightly above center for room to open down
+        let baseY = h * 0.35
 
         if isSpeaking {
-            // ---- SPEAKING MOUTH: Opens proportionally to audioLevel ----
-            // audioLevel 0 = gentle closed smile, audioLevel 1 = wide open mouth
-            let openAmount = audioLevel  // 0.0 to ~0.95
-
-            // Endpoints pull slightly inward as mouth opens (natural lip movement)
+            let openAmount = audioLevel
             let inward = openAmount * w * 0.06
-            let start = CGPoint(x: inward, y: baseY)
-            let end = CGPoint(x: w - inward, y: baseY)
+            let s = CGPoint(x: inward, y: baseY)
+            let e = CGPoint(x: w - inward, y: baseY)
 
-            // Top lip: slight upward curve that increases with opening
-            let topCurve = baseY - h * 0.08 * openAmount
-            // Bottom lip: dramatic downward drop proportional to audio level
-            let bottomDrop = baseY + h * 0.55 * openAmount
-
-            // Draw top lip arc
-            path.move(to: start)
+            path.move(to: s)
+            // Top lip
             path.addQuadCurve(
-                to: end,
-                control: CGPoint(x: w / 2, y: topCurve)
+                to: e,
+                control: CGPoint(x: w / 2, y: baseY - h * 0.08 * openAmount)
             )
-            // Draw bottom lip arc back to start
+            // Bottom lip drops dynamically
             path.addQuadCurve(
-                to: start,
-                control: CGPoint(x: w / 2, y: bottomDrop)
+                to: s,
+                control: CGPoint(x: w / 2, y: baseY + h * 0.55 * openAmount + h * 0.3)
             )
             path.closeSubpath()
         } else if isError {
-            // Frown: curve upward (inverted smile)
-            let start = CGPoint(x: padding, y: baseY)
-            let end = CGPoint(x: w - padding, y: baseY)
+            // Frown: Inverted arc
+            let start = CGPoint(x: w * 0.2, y: baseY)
+            let end = CGPoint(x: w * 0.8, y: baseY)
             path.move(to: start)
-            path.addQuadCurve(to: end, control: CGPoint(x: w / 2, y: baseY - h * 0.25))
+            path.addQuadCurve(to: end, control: CGPoint(x: w / 2, y: baseY - h * 0.35))
         } else if isThinking {
-            // Puzzled: slight upward curve, narrower mouth
-            let start = CGPoint(x: padding, y: baseY)
-            let end = CGPoint(x: w - padding, y: baseY)
-            path.move(to: start)
-            path.addQuadCurve(to: end, control: CGPoint(x: w / 2, y: baseY - 5))
+            // Puzzled: Smaller, flatter arc
+            path.move(to: CGPoint(x: w * 0.25, y: baseY))
+            path.addQuadCurve(to: CGPoint(x: w * 0.75, y: baseY), control: CGPoint(x: w / 2, y: baseY + h * 0.1))
         } else if isSmiling {
-            // Big Smile
-            let start = CGPoint(x: 0, y: baseY)
-            let end = CGPoint(x: w, y: baseY)
-            path.move(to: start)
-            path.addQuadCurve(to: end, control: CGPoint(x: w / 2, y: baseY + h * 0.45))
+            // Big Smile (Success): Deep U-shape
+            let padding: CGFloat = 0
+            path.move(to: CGPoint(x: padding, y: baseY))
+            path.addQuadCurve(to: CGPoint(x: w - padding, y: baseY), control: CGPoint(x: w / 2, y: baseY + h * 0.65))
         } else {
-            // Default gentle smile (logo match) — clearly closed
-            let start = CGPoint(x: 0, y: baseY)
-            let end = CGPoint(x: w, y: baseY)
-            path.move(to: start)
-            path.addQuadCurve(to: end, control: CGPoint(x: w / 2, y: baseY + h * 0.3))
+            // Default: Smooth perfect smile matching the friendly curve of the mascot
+            let padding: CGFloat = w * 0.15
+            path.move(to: CGPoint(x: padding, y: baseY))
+            path.addQuadCurve(to: CGPoint(x: w - padding, y: baseY), control: CGPoint(x: w / 2, y: baseY + h * 0.45))
         }
 
         return path

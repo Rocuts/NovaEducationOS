@@ -747,6 +747,29 @@ ScrollView {
 
 ---
 
+## 11. Phase 4 Hardening (Applied)
+
+### 11.1 Foundation Models
+
+- System instructions moved to stable policy-only content (no direct interpolation of student-controlled text).
+- Dynamic student context now sent as per-turn payload blocks and sanitized before usage.
+- Added session `prewarm()` after creation, with cancellation when session is recreated.
+- Added explicit interaction mode isolation for requests (`text` vs `voice`) to avoid cross-mode contamination.
+- Added modern generation error mapping for language/locale and guardrail categories.
+- Removed non-iOS legacy backend assumptions from error flow.
+
+### 11.2 Liquid Glass Scope
+
+- Navigation-layer glass retained (header/input/nav controls).
+- Decorative glass in scrolled content replaced with standard material where applicable.
+
+### 11.3 Swift 6 Preparation (No Flip Yet)
+
+- Project remains on `SWIFT_VERSION = 5.0` for this hardening iteration.
+- Next dedicated migration phase should enable Swift 6 and resolve strict-concurrency findings.
+
+---
+
 ## Sources
 
 ### Apple Official

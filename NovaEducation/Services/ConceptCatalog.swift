@@ -104,7 +104,6 @@ enum ConceptCatalog {
         "rosquilla": "toroide",
         "capsulas": "capsula",
         "prisma": "cubo",
-        "prismas": "cubo",
         "rectangulo": "cubo",
         "rectangulos": "cubo",
         "dado": "cubo",
@@ -131,6 +130,14 @@ enum ConceptCatalog {
         "universo": "sistema solar",
         "astro": "estrella",
         "lucero": "estrella",
+        "telescopios": "telescopio",
+        "un telescopio": "telescopio",
+        "astronomia": "telescopio",
+        "agujeros negros": "agujero negro",
+        "hoyo negro": "agujero negro",
+        "cohetes": "cohete",
+        "nave espacial": "cohete",
+        "transbordador": "cohete",
 
         // Biology synonyms
         "atomos": "atomo",
@@ -142,6 +149,9 @@ enum ConceptCatalog {
         "celula animal": "celula",
         "celula vegetal": "celula",
         "adn": "adn",
+        "a d n": "adn",
+        "codigo genetico": "adn",
+        "genetica": "adn",
         "acido desoxirribonucleico": "adn",
         "cadena de adn": "adn",
         "doble helice": "adn",
@@ -154,6 +164,11 @@ enum ConceptCatalog {
         "hojas": "hoja",
         "planta": "arbol",
         "plantas": "arbol",
+        "microscopios": "microscopio",
+        "un microscopio": "microscopio",
+        "fosiles": "fosil",
+        "dinosaurio fosil": "fosil",
+        "amonita": "fosil",
 
         // Anatomy synonyms
         "corazones": "corazon",
@@ -174,6 +189,9 @@ enum ConceptCatalog {
         "montanas": "montana",
         "cerro": "montana",
         "cerros": "montana",
+        "brujulas": "brujula",
+        "una brujula": "brujula",
+        "norte sur": "brujula",
 
         // Physics synonyms
         "pendulos": "pendulo",
@@ -185,6 +203,12 @@ enum ConceptCatalog {
         "ondas": "onda",
         "onda sonora": "onda",
         "onda electromagnetica": "onda",
+        "baterias": "bateria",
+        "pila": "bateria",
+        "pilas": "bateria",
+        "prismas": "prisma",
+        "dispersion de luz": "prisma",
+        "prisma optico": "prisma",
 
         // Chemistry synonyms
         "cristales": "cristal",
@@ -319,6 +343,27 @@ enum ConceptCatalog {
             englishImagePrompt: RenderPreset.star.englishImagePrompt,
             category: .astronomy
         ),
+        "telescopio": ConceptEntry(
+            preset: .telescope, primitive: nil, defaultMode: .object3d,
+            defaultColor: .black, defaultAnimation: .rotateSlow,
+            spanishCaption: "Telescopio",
+            englishImagePrompt: RenderPreset.telescope.englishImagePrompt,
+            category: .astronomy
+        ),
+        "agujero negro": ConceptEntry(
+            preset: .blackHole, primitive: nil, defaultMode: .object3d,
+            defaultColor: .black, defaultAnimation: .pulse,
+            spanishCaption: "Agujero Negro",
+            englishImagePrompt: RenderPreset.blackHole.englishImagePrompt,
+            category: .astronomy
+        ),
+        "cohete": ConceptEntry(
+            preset: .rocket, primitive: nil, defaultMode: .object3d,
+            defaultColor: .white, defaultAnimation: .bounce,
+            spanishCaption: "Cohete Espacial",
+            englishImagePrompt: RenderPreset.rocket.englishImagePrompt,
+            category: .astronomy
+        ),
 
         // ── Biology (10) ──────────────────────────────────────────────
 
@@ -392,6 +437,20 @@ enum ConceptCatalog {
             englishImagePrompt: "Simple ecosystem diagram food chain",
             category: .biology
         ),
+        "microscopio": ConceptEntry(
+            preset: .microscope, primitive: nil, defaultMode: .object3d,
+            defaultColor: .silver, defaultAnimation: .none,
+            spanishCaption: "Microscopio",
+            englishImagePrompt: RenderPreset.microscope.englishImagePrompt,
+            category: .biology
+        ),
+        "fosil": ConceptEntry(
+            preset: .fossil, primitive: nil, defaultMode: .object3d,
+            defaultColor: .brown, defaultAnimation: .rotateSlow,
+            spanishCaption: "Fósil",
+            englishImagePrompt: RenderPreset.fossil.englishImagePrompt,
+            category: .biology
+        ),
 
         // ── Anatomy (4) ──────────────────────────────────────────────
 
@@ -447,6 +506,13 @@ enum ConceptCatalog {
             englishImagePrompt: "River flowing through landscape educational",
             category: .geography
         ),
+        "brujula": ConceptEntry(
+            preset: .compass, primitive: nil, defaultMode: .object3d,
+            defaultColor: .gold, defaultAnimation: .none,
+            spanishCaption: "Brújula",
+            englishImagePrompt: RenderPreset.compass.englishImagePrompt,
+            category: .geography
+        ),
 
         // ── Physics (4) ──────────────────────────────────────────────
 
@@ -476,6 +542,20 @@ enum ConceptCatalog {
             defaultColor: .green, defaultAnimation: .none,
             spanishCaption: "Circuito",
             englishImagePrompt: "Simple electrical circuit diagram with battery and bulb",
+            category: .physics
+        ),
+        "prisma": ConceptEntry(
+            preset: .prism, primitive: nil, defaultMode: .object3d,
+            defaultColor: .white, defaultAnimation: .rotateSlow,
+            spanishCaption: "Prisma",
+            englishImagePrompt: RenderPreset.prism.englishImagePrompt,
+            category: .physics
+        ),
+        "bateria": ConceptEntry(
+            preset: .battery, primitive: nil, defaultMode: .object3d,
+            defaultColor: .green, defaultAnimation: .rotateSlow,
+            spanishCaption: "Batería",
+            englishImagePrompt: RenderPreset.battery.englishImagePrompt,
             category: .physics
         ),
 

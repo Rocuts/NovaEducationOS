@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import FoundationModels
+import os
+
+private let logger = Logger(subsystem: "com.nova.education", category: "ChatView")
 
 struct ChatView: View {
     let subject: Subject
@@ -11,6 +14,7 @@ struct ChatView: View {
     @State private var sessionStartTime: Date?
     @State private var showingModelUnavailableAlert = false
     @State private var showVoiceMode = false
+    @State private var showDeleteConfirmation = false
     @Environment(FocusManager.self) private var focusManager
     @Namespace private var inputGlassNamespace
 
@@ -44,13 +48,6 @@ struct ChatView: View {
                     modelUnavailableBanner(reason: reason)
                 }
 
-                // Image generation banner
-                ImageGenerationBanner(
-                    state: viewModel.imageGenerationState,
-                    subjectColor: subject.color
-                )
-                .animation(Nova.Animation.springDefault, value: viewModel.imageGenerationState.isActive)
-
                 // Messages
                 messagesScrollView
 
@@ -79,8 +76,7 @@ struct ChatView: View {
                         dismiss()
                     },
                     onDelete: {
-                        textToSpeechService.stop()
-                        viewModel.clearHistory(context: modelContext, messages: history)
+                        showDeleteConfirmation = true
                     },
                     onVoiceMode: {
                         showVoiceMode = true
@@ -147,19 +143,28 @@ struct ChatView: View {
         .fullScreenCover(isPresented: $showVoiceMode) {
             VoiceModeView()
         }
-        .onChange(of: viewModel.errorMessage) { _, newValue in
-            if newValue != nil {
-                // Trigger alert or showing mechanism
+        .confirmationDialog("¿Eliminar conversación?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Eliminar", role: .destructive) {
+                textToSpeechService.stop()
+                viewModel.clearHistory(context: modelContext, messages: history)
+            }
+            Button("Cancelar", role: .cancel) { }
+        } message: {
+            Text("Se eliminarán todos los mensajes de esta conversación. Esta acción no se puede deshacer.")
+        }
+        .onChange(of: viewModel.currentInput) { _, newValue in
+            if newValue.count > 4000 {
+                viewModel.currentInput = String(newValue.prefix(4000))
             }
         }
         .alert("Error", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.dismissError() } }
         )) {
-            Button("OK", role: .cancel) { }
+            Button("Aceptar", role: .cancel) { }
             if let _ = viewModel.errorRecoverySuggestion {
                 Button("Reintentar") {
-                    viewModel.sendMessage(context: modelContext, history: Array(history))
+                    viewModel.retryLastFailedMessage(context: modelContext, history: Array(history))
                 }
             }
         } message: {
@@ -247,17 +252,7 @@ struct ChatView: View {
                         .id(msg.id)
                     }
 
-                    // Show thinking bubble when generating image
-                    if viewModel.isGeneratingImage {
-                        ThinkingBubble(subjectColor: subject.color)
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .opacity
-                            ))
-                            .id("thinking-bubble")
-                    }
                 }
-                .animation(Nova.Animation.springDefault, value: viewModel.isGeneratingImage)
                 .padding()
                 .padding(.bottom, Nova.Spacing.xl)
             }
@@ -267,11 +262,6 @@ struct ChatView: View {
             }
             .onChange(of: history.last?.content) {
                 scrollToBottom(proxy: proxy)
-            }
-            .onChange(of: viewModel.isGeneratingImage) { _, isGenerating in
-                if isGenerating {
-                    scrollToThinkingBubble(proxy: proxy)
-                }
             }
         }
     }
@@ -308,16 +298,14 @@ struct ChatView: View {
                 featureHints
             }
 
-            // Image generation hint for supported subjects
-            if subject.supportsImages {
-                imageHints
-            }
+            // 3D visualization hint
+            renderHints
         }
         .padding(.vertical, Nova.Spacing.jumbo)
         .padding(.horizontal, Nova.Spacing.screenHorizontal)
     }
 
-    private var imageHints: some View {
+    private var renderHints: some View {
         VStack(spacing: Nova.Spacing.sm) {
             if !subject.hasSpecialKeyboard {
                 Divider()
@@ -325,9 +313,9 @@ struct ChatView: View {
             }
 
             HStack(spacing: Nova.Spacing.sm) {
-                Image(systemName: "apple.image.playground")
+                Image(systemName: "cube.fill")
                     .foregroundStyle(subject.color)
-                Text("Puedo generar imágenes para ayudarte a visualizar conceptos")
+                Text("Pídeme que te muestre figuras y modelos 3D interactivos")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -627,7 +615,7 @@ struct ChatView: View {
             // Haptic feedback
             Nova.Haptics.medium()
         } catch {
-            print("Error recording: \(error)")
+            logger.error("Error recording: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -636,7 +624,7 @@ struct ChatView: View {
         
         if isRecordingCancelled {
             // Cancelled
-            print("Recording cancelled")
+            logger.info("Recording cancelled")
             Nova.Haptics.error()
         } else {
             // Success: Send
@@ -649,7 +637,7 @@ struct ChatView: View {
     // Locked mode actions
     private func cancelLockedRecording() {
         speechService.stopRecording()
-        print("Locked recording cancelled")
+        logger.info("Locked recording cancelled")
         resetRecordingState()
     }
     
@@ -710,22 +698,20 @@ struct ChatView: View {
         }
     }
 
-    private func scrollToThinkingBubble(proxy: ScrollViewProxy) {
-        withAnimation(Nova.Animation.exitMedium) {
-            proxy.scrollTo("thinking-bubble", anchor: .bottom)
-        }
-    }
 
     // MARK: - Session Configuration
     private func configureSessionWithStudentData() {
-        guard !sessionConfigured else { return }
-
         // Get student data from settings
         let studentName = settings?.studentName ?? "Estudiante"
         let educationLevel = settings?.educationLevel ?? .secondary
 
-        // TODO: Replacing the entire ViewModel loses any in-flight state. Consider adding
-        // a reconfigure(studentName:educationLevel:) method to ChatViewModel instead.
+        if sessionConfigured {
+            // Session already exists — reconfigure without replacing the instance
+            viewModel.reconfigure(studentName: studentName, educationLevel: educationLevel)
+            return
+        }
+
+        // First-time setup
         viewModel = ChatViewModel(
             subject: subject,
             studentName: studentName,

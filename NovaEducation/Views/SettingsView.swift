@@ -4,62 +4,59 @@ import SwiftData
 struct SettingsView: View {
     @Bindable var settings: UserSettings
     @Environment(\.modelContext) private var modelContext
-    @State private var showingNameEditor = false
-    @State private var tempName = ""
-    @State private var showNotificationDeniedAlert = false
-    @State private var sectionsAppeared = false
+    @State private var viewModel = SettingsViewModel()
 
     var body: some View {
         ScrollView {
             VStack(spacing: Nova.Spacing.sectionGap) {
                 // Profile Section
                 profileSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 15)
-                    .animation(Nova.Animation.stagger(index: 0), value: sectionsAppeared)
+                    .opacity(viewModel.sectionsAppeared ? 1 : 0)
+                    .offset(y: viewModel.sectionsAppeared ? 0 : 15)
+                    .animation(Nova.Animation.stagger(index: 0), value: viewModel.sectionsAppeared)
 
                 // Study Preferences
                 studyPreferencesSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 15)
-                    .animation(Nova.Animation.stagger(index: 1), value: sectionsAppeared)
+                    .opacity(viewModel.sectionsAppeared ? 1 : 0)
+                    .offset(y: viewModel.sectionsAppeared ? 0 : 15)
+                    .animation(Nova.Animation.stagger(index: 1), value: viewModel.sectionsAppeared)
 
                 // Notifications
                 notificationsSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 15)
-                    .animation(Nova.Animation.stagger(index: 2), value: sectionsAppeared)
+                    .opacity(viewModel.sectionsAppeared ? 1 : 0)
+                    .offset(y: viewModel.sectionsAppeared ? 0 : 15)
+                    .animation(Nova.Animation.stagger(index: 2), value: viewModel.sectionsAppeared)
 
                 // Appearance
                 appearanceSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 15)
-                    .animation(Nova.Animation.stagger(index: 3), value: sectionsAppeared)
+                    .opacity(viewModel.sectionsAppeared ? 1 : 0)
+                    .offset(y: viewModel.sectionsAppeared ? 0 : 15)
+                    .animation(Nova.Animation.stagger(index: 3), value: viewModel.sectionsAppeared)
 
                 // Accessibility
                 accessibilitySection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 15)
-                    .animation(Nova.Animation.stagger(index: 4), value: sectionsAppeared)
+                    .opacity(viewModel.sectionsAppeared ? 1 : 0)
+                    .offset(y: viewModel.sectionsAppeared ? 0 : 15)
+                    .animation(Nova.Animation.stagger(index: 4), value: viewModel.sectionsAppeared)
 
                 // About
                 aboutSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 15)
-                    .animation(Nova.Animation.stagger(index: 5), value: sectionsAppeared)
+                    .opacity(viewModel.sectionsAppeared ? 1 : 0)
+                    .offset(y: viewModel.sectionsAppeared ? 0 : 15)
+                    .animation(Nova.Animation.stagger(index: 5), value: viewModel.sectionsAppeared)
             }
             .padding()
-            .onAppear { sectionsAppeared = true }
+            .onAppear { viewModel.sectionsAppeared = true }
         }
         .contentMargins(.bottom, 100, for: .scrollContent)
         .background(backgroundGradient)
         .navigationTitle("Ajustes")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .sheet(isPresented: $showingNameEditor) {
+        .sheet(isPresented: $viewModel.showingNameEditor) {
             nameEditorSheet
         }
-        .alert("Notificaciones deshabilitadas", isPresented: $showNotificationDeniedAlert) {
+        .alert("Notificaciones deshabilitadas", isPresented: $viewModel.showNotificationDeniedAlert) {
             Button("Abrir Ajustes") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
@@ -70,13 +67,13 @@ struct SettingsView: View {
             Text("Para recibir recordatorios de estudio, habilita las notificaciones en los ajustes del sistema.")
         }
         .onChange(of: settings.notificationsEnabled) {
-            updateNotifications()
+            viewModel.updateNotifications(settings: settings)
         }
         .onChange(of: settings.studyRemindersEnabled) {
-            updateNotifications()
+            viewModel.updateNotifications(settings: settings)
         }
         .onChange(of: settings.studyReminderTime) {
-            updateNotifications()
+            viewModel.updateNotifications(settings: settings)
         }
     }
 
@@ -119,8 +116,8 @@ struct SettingsView: View {
 
             // Edit Button
             Button {
-                tempName = settings.studentName
-                showingNameEditor = true
+                viewModel.tempName = settings.studentName
+                viewModel.showingNameEditor = true
             } label: {
                 Label("Editar perfil", systemImage: "pencil")
                     .font(.subheadline)
@@ -355,7 +352,7 @@ struct SettingsView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                TextField("Nombre", text: $tempName)
+                TextField("Nombre", text: $viewModel.tempName)
                     .font(.title3)
                     .multilineTextAlignment(.center)
                     .padding()
@@ -369,17 +366,13 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") {
-                        showingNameEditor = false
+                        viewModel.showingNameEditor = false
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Guardar") {
-                        if !tempName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            settings.studentName = tempName.trimmingCharacters(in: .whitespacesAndNewlines)
-                            settings.updatedAt = Date()
-                        }
-                        showingNameEditor = false
+                        viewModel.saveName(settings: settings)
                     }
                     .fontWeight(.semibold)
                 }
@@ -387,23 +380,6 @@ struct SettingsView: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
-    }
-    private func updateNotifications() {
-        if settings.notificationsEnabled && settings.studyRemindersEnabled {
-            Task {
-                let granted = await NotificationManager.shared.requestPermissionAsync()
-                if granted {
-                    NotificationManager.shared.scheduleDailyReminder(at: settings.studyReminderTime)
-                } else {
-                    await MainActor.run {
-                        settings.notificationsEnabled = false
-                        showNotificationDeniedAlert = true
-                    }
-                }
-            }
-        } else {
-            NotificationManager.shared.cancelReminders()
-        }
     }
 
     private var appVersion: String {

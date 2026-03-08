@@ -575,7 +575,10 @@ struct CompactXPDisplay: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .glassEffect(.regular, in: Capsule())
+        .background(.regularMaterial, in: Capsule())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Nivel \(currentLevel), \(currentXP) puntos de experiencia")
+        .accessibilityValue("\(Int(progress * 100)) por ciento completado")
     }
 }
 

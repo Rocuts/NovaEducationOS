@@ -67,6 +67,15 @@ enum Subject: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    /// Returns true if this subject has a deterministic interceptor
+    /// that handles computation/fact-lookup before the LLM
+    var hasInterceptor: Bool {
+        switch self {
+        case .math, .physics, .chemistry, .language: return true
+        default: return false
+        }
+    }
+
     /// Returns true if this subject should show a specialized keyboard
     var hasSpecialKeyboard: Bool {
         switch self {
@@ -77,14 +86,13 @@ enum Subject: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// Returns true if this subject benefits from AI-generated images
-    /// Images help visualize concepts in these subjects
+    /// Indicates if this subject benefits from AI-generated educational images.
+    /// Visual subjects (animals, geography, art) get image generation; abstract subjects (math, logic) do not.
     var supportsImages: Bool {
         switch self {
         case .open, .science, .social, .language, .english, .arts, .sports:
             return true
         case .math, .physics, .chemistry, .technology, .ethics:
-            // These subjects require precise diagrams/formulas that AI images can't accurately represent
             return false
         }
     }

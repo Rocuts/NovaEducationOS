@@ -12,23 +12,7 @@ struct HomeView: View {
         GridItem(.adaptive(minimum: 150), spacing: Nova.Spacing.lg)
     ]
 
-    private var greeting: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<12:
-            return "Buenos días"
-        case 12..<19:
-            return "Buenas tardes"
-        default:
-            return "Buenas noches"
-        }
-    }
-
-    @State private var showingGoalSheet = false
-    @State private var todayQuests: [DailyQuest] = []
-    @State private var currentStreak: Int = 0
-    @State private var showQuestsExpanded = false
-    @State private var hasScrolled = false
+    @State private var viewModel = HomeViewModel()
     @Namespace private var statsGlassNamespace
 
     // Entrance animation states
@@ -55,9 +39,9 @@ struct HomeView: View {
         .coordinateSpace(name: "homeScroll")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
             let scrolled = offset < -10
-            if scrolled != hasScrolled {
+            if scrolled != viewModel.hasScrolled {
                 withAnimation(Nova.Animation.springSnappy) {
-                    hasScrolled = scrolled
+                    viewModel.hasScrolled = scrolled
                 }
             }
         }
@@ -86,45 +70,10 @@ struct HomeView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            loadGamificationData()
+            viewModel.loadGamificationData(context: modelContext)
         }
     }
 
-    // MARK: - Load Gamification Data
-
-    private func loadGamificationData() {
-        DailyQuestService.shared.loadTodayQuests(context: modelContext)
-
-        if DailyQuestService.shared.needsQuestGeneration(context: modelContext) {
-            DailyQuestService.shared.generateDefaultQuests(context: modelContext)
-        }
-
-        todayQuests = DailyQuestService.shared.todayQuests
-        currentStreak = calculateCurrentStreak()
-    }
-
-    private func calculateCurrentStreak() -> Int {
-        let descriptor = FetchDescriptor<DailyActivity>(
-            sortBy: [SortDescriptor(\.date, order: .reverse)]
-        )
-        guard let activities = try? modelContext.fetch(descriptor) else { return 0 }
-
-        var streak = 0
-        var expectedDate = Calendar.current.startOfDay(for: Date())
-
-        for activity in activities {
-            let activityDate = Calendar.current.startOfDay(for: activity.date)
-
-            if activityDate == expectedDate && activity.wasActive {
-                streak += 1
-                expectedDate = Calendar.current.date(byAdding: .day, value: -1, to: expectedDate) ?? expectedDate
-            } else if activityDate < expectedDate {
-                break
-            }
-        }
-
-        return streak
-    }
 
     // MARK: - Header Section
 
@@ -133,7 +82,7 @@ struct HomeView: View {
             // Top row: Greeting + Focus toggle
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: Nova.Spacing.xxxs) {
-                    Text(greeting)
+                    Text(viewModel.greeting)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
@@ -188,8 +137,8 @@ struct HomeView: View {
                 .glassEffectID("xpDisplay", in: statsGlassNamespace)
 
                 // Streak — morphs in/out of the XP display glass group
-                if currentStreak > 0 {
-                    StreakBadge(days: currentStreak)
+                if viewModel.currentStreak > 0 {
+                    StreakBadge(days: viewModel.currentStreak)
                         .glassEffectID("streakBadge", in: statsGlassNamespace)
                 }
             }
@@ -197,13 +146,13 @@ struct HomeView: View {
             Spacer()
 
             // Quests shortcut
-            if !todayQuests.isEmpty {
+            if !viewModel.todayQuests.isEmpty {
                 Button {
-                    showQuestsExpanded = true
+                    viewModel.showQuestsExpanded = true
                 } label: {
-                    let completed = todayQuests.filter { $0.isCompleted }.count
-                    let total = todayQuests.count
-                    let pendingXP = todayQuests.filter { $0.isActive }.reduce(0) { $0 + $1.xpReward }
+                    let completed = viewModel.todayQuests.filter { $0.isCompleted }.count
+                    let total = viewModel.todayQuests.count
+                    let pendingXP = viewModel.todayQuests.filter { $0.isActive }.reduce(0) { $0 + $1.xpReward }
 
                     HStack(spacing: Nova.Spacing.xs) {
                         Image(systemName: "target")
@@ -221,13 +170,13 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, Nova.Spacing.sm)
                     .padding(.vertical, Nova.Spacing.xs)
-                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .background(.regularMaterial, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .sheet(isPresented: $showQuestsExpanded) {
-            QuestsDetailSheet(quests: $todayQuests, modelContext: modelContext)
+        .sheet(isPresented: $viewModel.showQuestsExpanded) {
+            QuestsDetailSheet(quests: $viewModel.todayQuests, modelContext: modelContext)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -275,7 +224,7 @@ struct HomeView: View {
                     color: .orange,
                     hint: "Toca dos veces para configurar tu meta de estudio"
                 ) {
-                    showingGoalSheet = true
+                    viewModel.showingGoalSheet = true
                 }
                 .opacity(chipsAppeared ? 1 : 0)
                 .offset(y: chipsAppeared ? 0 : 20)
@@ -284,7 +233,7 @@ struct HomeView: View {
             .padding(.horizontal, Nova.Spacing.screenHorizontal)
             .onAppear { chipsAppeared = true }
         }
-        .sheet(isPresented: $showingGoalSheet) {
+        .sheet(isPresented: $viewModel.showingGoalSheet) {
             GoalEditView(settings: settings)
                 .presentationDetents([.height(350)])
                 .presentationDragIndicator(.visible)
@@ -358,7 +307,7 @@ struct QuickActionChip: View {
             }
             .padding(.horizontal, Nova.Spacing.md)
             .padding(.vertical, Nova.Spacing.sm)
-            .glassEffect(.regular.interactive(), in: Capsule())
+            .background(.regularMaterial, in: Capsule())
         }
         .buttonStyle(.squishy)
         .accessibilityElement(children: .combine)
@@ -387,7 +336,7 @@ struct StreakBadge: View {
         }
         .padding(.horizontal, Nova.Spacing.sm)
         .padding(.vertical, Nova.Spacing.xs)
-        .glassEffect(.regular, in: Capsule())
+        .background(.regularMaterial, in: Capsule())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Racha de \(days) \(days == 1 ? "día" : "días")")
     }

@@ -20,6 +20,7 @@ struct SubjectKeyboardToolbar: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .accessibilityLabel(accessibilityName(for: symbol, keyboard: keyboardType))
                 }
             }
             .padding(.horizontal)
@@ -140,6 +141,187 @@ struct SubjectKeyboardToolbar: View {
         case "m/s": return "m/s"
         case "m/s²": return "m/s²"
         default: return raw
+        }
+    }
+
+    // MARK: - Accessibility Names
+    private func accessibilityName(for symbol: String, keyboard: SubjectKeyboardType) -> String {
+        // Context-dependent symbols
+        if symbol == "N" {
+            return keyboard == .chemistry ? "Nitrógeno" : "Newtons"
+        }
+        if symbol == "M" {
+            return keyboard == .chemistry ? "Molar" : "Mega"
+        }
+        if symbol == "m" {
+            return keyboard == .physics ? "Mili" : symbol
+        }
+        switch symbol {
+        // Basic arithmetic
+        case "+": return "Más"
+        case "-": return "Menos"
+        case "×": return "Multiplicar"
+        case "÷": return "Dividir"
+        case "=": return "Igual"
+        case "≠": return "No igual"
+
+        // Powers and roots
+        case "√": return "Raíz cuadrada"
+        case "∛": return "Raíz cúbica"
+        case "x²": return "X al cuadrado"
+        case "xⁿ": return "X a la n"
+        case "xₙ": return "X sub n"
+
+        // Constants
+        case "π": return "Pi"
+        case "e": return "Euler"
+        case "∞": return "Infinito"
+
+        // Calculus
+        case "∫": return "Integral"
+        case "∂": return "Derivada parcial"
+        case "∑", "Σ": return "Sumatoria"
+        case "∏": return "Productoria"
+        case "lim": return "Límite"
+
+        // Trigonometry
+        case "sin": return "Seno"
+        case "cos": return "Coseno"
+        case "tan": return "Tangente"
+        case "log": return "Logaritmo"
+        case "ln": return "Logaritmo natural"
+
+        // Comparison
+        case "<": return "Menor que"
+        case ">": return "Mayor que"
+        case "≤": return "Menor o igual"
+        case "≥": return "Mayor o igual"
+        case "≈": return "Aproximadamente"
+
+        // Grouping
+        case "(": return "Paréntesis izquierdo"
+        case ")": return "Paréntesis derecho"
+        case "[": return "Corchete izquierdo"
+        case "]": return "Corchete derecho"
+        case "{": return "Llave izquierda"
+        case "}": return "Llave derecha"
+
+        // Fractions
+        case "½": return "Un medio"
+        case "⅓": return "Un tercio"
+        case "¼": return "Un cuarto"
+
+        // Arrows
+        case "→": return "Flecha derecha"
+        case "←": return "Flecha izquierda"
+        case "↔": return "Flecha doble"
+        case "⇌": return "Equilibrio"
+
+        // Sets
+        case "∈": return "Pertenece a"
+        case "∉": return "No pertenece"
+        case "⊂": return "Subconjunto"
+        case "∪": return "Unión"
+        case "∩": return "Intersección"
+
+        // Greek letters (physics)
+        case "α": return "Alfa"
+        case "β": return "Beta"
+        case "γ": return "Gamma"
+        case "δ": return "Delta"
+        case "θ": return "Theta"
+        case "λ": return "Lambda"
+        case "μ": return "Mu"
+        case "ω": return "Omega"
+        case "Ω": return "Omega mayúscula"
+        case "Δ": return "Delta mayúscula"
+        case "φ": return "Fi"
+        case "ρ": return "Rho"
+        case "τ": return "Tau"
+
+        // Vectors
+        case "∇": return "Nabla"
+        case "d/dt": return "Derivada temporal"
+
+        // Powers (physics)
+        case "²": return "Al cuadrado"
+        case "³": return "Al cubo"
+        case "⁻¹": return "Inverso"
+        case "⁻²": return "Menos dos"
+
+        // Units
+        case "m/s": return "Metros por segundo"
+        case "m/s²": return "Metros por segundo al cuadrado"
+        case "kg": return "Kilogramos"
+        // "N" handled above (context-dependent: Newtons vs Nitrógeno)
+        case "J": return "Joules"
+        case "W": return "Watts"
+        case "Pa": return "Pascales"
+        case "Hz": return "Hertz"
+        case "V": return "Voltios"
+        case "A": return "Amperios"
+        case "°": return "Grados"
+        case "°C": return "Grados Celsius"
+
+        // Unit prefixes
+        case "k": return "Kilo"
+        // "M" handled above (context-dependent: Mega vs Molar)
+        case "G": return "Giga"
+        // "m" handled above (context-dependent)
+        case "n": return "Nano"
+
+        // Chemistry subscripts
+        case "₀": return "Subíndice cero"
+        case "₁": return "Subíndice uno"
+        case "₂": return "Subíndice dos"
+        case "₃": return "Subíndice tres"
+        case "₄": return "Subíndice cuatro"
+        case "₅": return "Subíndice cinco"
+        case "₆": return "Subíndice seis"
+        case "₇": return "Subíndice siete"
+        case "₈": return "Subíndice ocho"
+        case "₉": return "Subíndice nueve"
+
+        // Chemistry charges
+        case "⁺": return "Carga positiva"
+        case "⁻": return "Carga negativa"
+        case "²⁺": return "Dos positivo"
+        case "²⁻": return "Dos negativo"
+        case "³⁺": return "Tres positivo"
+        case "³⁻": return "Tres negativo"
+
+        // States of matter
+        case "(s)": return "Sólido"
+        case "(l)": return "Líquido"
+        case "(g)": return "Gas"
+        case "(aq)": return "Acuoso"
+
+        // Chemical bonds
+        case "—": return "Enlace simple"
+        case "═": return "Enlace doble"
+        case "≡": return "Enlace triple"
+
+        // Chemistry other
+        case "pH": return "pH"
+        case "mol": return "Mol"
+
+        // Elements
+        case "H": return "Hidrógeno"
+        case "C": return "Carbono"
+        case "O": return "Oxígeno"
+        case "S": return "Azufre"
+        case "P": return "Fósforo"
+        case "Na": return "Sodio"
+        case "K": return "Potasio"
+        case "Ca": return "Calcio"
+        case "Mg": return "Magnesio"
+        case "Fe": return "Hierro"
+        case "Cu": return "Cobre"
+        case "Zn": return "Zinc"
+        case "Cl": return "Cloro"
+        case "Br": return "Bromo"
+
+        default: return symbol
         }
     }
 

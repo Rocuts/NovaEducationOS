@@ -72,62 +72,81 @@ extension RenderMetricEntry.RouterDecision {
 }
 
 // MARK: - RenderMetrics Logger
+// Thread-safe via NSLock — same pattern as InterceptorMetrics.
+// All reads and writes to mutable static state are protected by the lock.
 
 enum RenderMetrics {
     private static let logger = Logger(subsystem: "com.nova.education", category: "RenderPipeline")
 
+    private static let lock = NSLock()
+
     /// In-memory ring buffer for recent metrics (last 100 entries)
-    private static var recentEntries: [RenderMetricEntry] = []
+    private static var buffer: [RenderMetricEntry] = []
     private static let maxEntries = 100
 
-    // MARK: - Counters
+    // MARK: - Counters (all access guarded by `lock`)
 
-    private(set) static var totalRequests = 0
-    private(set) static var totalSuccesses = 0
-    private(set) static var totalFallbacks = 0
-    private(set) static var totalFailures = 0
-    private(set) static var catalogHits = 0
-    private(set) static var llmExtractions = 0
+    private static var _totalRequests = 0
+    private static var _totalSuccesses = 0
+    private static var _totalFallbacks = 0
+    private static var _totalFailures = 0
+    private static var _catalogHits = 0
+    private static var _llmExtractions = 0
+
+    static var totalRequests: Int { lock.withLock { _totalRequests } }
+    static var totalSuccesses: Int { lock.withLock { _totalSuccesses } }
+    static var totalFallbacks: Int { lock.withLock { _totalFallbacks } }
+    static var totalFailures: Int { lock.withLock { _totalFailures } }
+    static var catalogHits: Int { lock.withLock { _catalogHits } }
+    static var llmExtractions: Int { lock.withLock { _llmExtractions } }
 
     /// Success rate as percentage
     static var successRate: Double {
-        guard totalRequests > 0 else { return 100.0 }
-        return Double(totalSuccesses + totalFallbacks) / Double(totalRequests) * 100.0
+        lock.withLock {
+            guard _totalRequests > 0 else { return 100.0 }
+            return Double(_totalSuccesses + _totalFallbacks) / Double(_totalRequests) * 100.0
+        }
     }
 
     /// Catalog hit rate as percentage
     static var catalogHitRate: Double {
-        guard totalRequests > 0 else { return 0.0 }
-        return Double(catalogHits) / Double(totalRequests) * 100.0
+        lock.withLock {
+            guard _totalRequests > 0 else { return 0.0 }
+            return Double(_catalogHits) / Double(_totalRequests) * 100.0
+        }
     }
 
     // MARK: - Logging
 
     static func log(_ entry: RenderMetricEntry) {
-        totalRequests += 1
+        lock.lock()
+
+        _totalRequests += 1
 
         switch entry.renderResult {
         case .success:
-            totalSuccesses += 1
+            _totalSuccesses += 1
         case .fallback:
-            totalFallbacks += 1
+            _totalFallbacks += 1
         case .failure:
-            totalFailures += 1
+            _totalFailures += 1
         }
 
         if entry.routerDecision.catalogHit {
-            catalogHits += 1
+            _catalogHits += 1
         } else {
-            llmExtractions += 1
+            _llmExtractions += 1
         }
 
         // Store in ring buffer
-        recentEntries.append(entry)
-        if recentEntries.count > maxEntries {
-            recentEntries.removeFirst()
+        buffer.append(entry)
+        if buffer.count > maxEntries {
+            buffer.removeFirst()
         }
 
-        // Log to system console
+        lock.unlock()
+
+        // Log to system console (no lock needed — Logger is thread-safe)
         let resultStr: String
         switch entry.renderResult {
         case .success(let id, let mode):
@@ -156,28 +175,32 @@ enum RenderMetrics {
 
     /// Returns recent entries for debugging UI
     static func getRecentEntries() -> [RenderMetricEntry] {
-        recentEntries
+        lock.withLock { buffer }
     }
 
     /// Resets all counters (for testing)
     static func reset() {
-        totalRequests = 0
-        totalSuccesses = 0
-        totalFallbacks = 0
-        totalFailures = 0
-        catalogHits = 0
-        llmExtractions = 0
-        recentEntries.removeAll()
+        lock.lock()
+        defer { lock.unlock() }
+        _totalRequests = 0
+        _totalSuccesses = 0
+        _totalFallbacks = 0
+        _totalFailures = 0
+        _catalogHits = 0
+        _llmExtractions = 0
+        buffer.removeAll()
     }
 
     /// Summary string for debugging
     static var summary: String {
-        """
-        Render Pipeline Metrics:
-          Total: \(totalRequests) | Success: \(totalSuccesses) | Fallback: \(totalFallbacks) | Failure: \(totalFailures)
-          Success Rate: \(String(format: "%.1f", successRate))%
-          Catalog Hits: \(catalogHits) (\(String(format: "%.1f", catalogHitRate))%)
-          LLM Extractions: \(llmExtractions)
-        """
+        lock.withLock {
+            """
+            Render Pipeline Metrics:
+              Total: \(_totalRequests) | Success: \(_totalSuccesses) | Fallback: \(_totalFallbacks) | Failure: \(_totalFailures)
+              Success Rate: \(String(format: "%.1f", _totalRequests > 0 ? Double(_totalSuccesses + _totalFallbacks) / Double(_totalRequests) * 100.0 : 100.0))%
+              Catalog Hits: \(_catalogHits) (\(String(format: "%.1f", _totalRequests > 0 ? Double(_catalogHits) / Double(_totalRequests) * 100.0 : 0.0))%)
+              LLM Extractions: \(_llmExtractions)
+            """
+        }
     }
 }

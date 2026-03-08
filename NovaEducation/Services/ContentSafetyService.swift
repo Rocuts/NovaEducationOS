@@ -20,7 +20,7 @@ struct ContentSafetyService {
 
     private static let phoneRegex: NSRegularExpression? = {
         try? NSRegularExpression(
-            pattern: #"(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s.-]\d{2,4}[\s.-]\d{2,4}"#,
+            pattern: #"\\+?\\d{1,3}?[- .]?\\(?\\d{2,4}\\)?[- .]?\\d{3,4}[- .]?\\d{3,4}"#,
             options: []
         )
     }()

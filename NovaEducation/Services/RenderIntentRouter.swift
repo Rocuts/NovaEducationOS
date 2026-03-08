@@ -15,10 +15,28 @@ enum RenderIntentRouter {
         let normalized = normalize(text)
         let words = Set(normalized.split(separator: " ").map(String.init))
 
+        // 0. Check negation — "no me muestres", "no quiero ver" etc.
+        let hasNegation = negationPatterns.contains { normalized.contains($0) }
+        if hasNegation { return .none }
+
         // 1. Check for modification requests (references to previous render)
         let modification = detectModification(normalized, words: words)
         if modification.isModification {
             return modification
+        }
+
+        // 1b. Check for repeat requests ("otra vez", "de nuevo", "lo mismo")
+        let isRepeat = repeatPatterns.contains { normalized.contains($0) }
+        if isRepeat {
+            return RouterResult(
+                intent: .render3D,
+                detectedColor: detectColor(normalized, words: words),
+                detectedPrimitive: nil,
+                detectedConcept: nil,
+                isModification: true,
+                modificationSize: nil,
+                modificationColor: detectColor(normalized, words: words)
+            )
         }
 
         // 2. Detect render verb / visual request pattern
@@ -209,6 +227,23 @@ enum RenderIntentRouter {
 
     // MARK: - Word Lists
 
+    /// Negation patterns — if present, do NOT trigger a render intent
+    private static let negationPatterns: [String] = [
+        "no me muestres", "no muestres", "no me ensenes",
+        "no dibujes", "no pintes", "no generes", "no crees",
+        "no quiero ver", "no necesito ver", "sin imagen",
+        "no hace falta", "no es necesario",
+        "no me hagas", "no renderices", "no visualices",
+    ]
+
+    /// Repeat patterns — re-render the previous asset
+    private static let repeatPatterns: [String] = [
+        "otra vez", "de nuevo", "lo mismo", "repitelo",
+        "vuelve a", "hazlo otra vez", "muestramelo de nuevo",
+        "otra vez lo mismo", "lo mismo otra vez",
+        "de nuevo lo mismo", "repite lo mismo",
+    ]
+
     /// Explicit render verbs — these alone trigger a render intent
     private static let renderVerbs: [String] = [
         // "show me"
@@ -220,12 +255,18 @@ enum RenderIntentRouter {
         "pintame", "pinteme", "pinta", "pinte", "pintar",
         // "generate / create / render"
         "genera", "generar", "genera una imagen", "genera un modelo",
+        "generame",
         "crea", "crear", "creame", "creeme",
         "renderiza", "renderizar",
         "visualiza", "visualizar",
-        // "make / build"
-        "haz", "hazme", "hacer",
+        // "make / build / put"
+        "haz", "hazme", "hacer", "hagame",
         "construye", "construir", "construyeme",
+        "ponme", "ponle", "pon ",
+        "armame", "arma ",
+        "formame", "forma ",
+        "representame", "representa ",
+        "disenme", "disena ",
     ]
 
     /// Visual request patterns — phrases that indicate visual intent

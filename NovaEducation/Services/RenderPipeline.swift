@@ -133,11 +133,11 @@ final class RenderPipeline {
 
         // First attempt
         do {
-            let extraction: RenderExtraction = try await session.respond(
+            let response = try await session.respond(
                 to: prompt,
                 generating: RenderExtraction.self
             )
-            return buildFromExtraction(extraction, routerResult: routerResult)
+            return buildFromExtraction(response.content, routerResult: routerResult)
         } catch {
             logger.warning("LLM extraction attempt 1 failed: \(error.localizedDescription)")
         }
@@ -148,11 +148,11 @@ final class RenderPipeline {
             let retrySession = LanguageModelSession {
                 "Extract render parameters only."
             }
-            let extraction: RenderExtraction = try await retrySession.respond(
+            let retryResponse = try await retrySession.respond(
                 to: "Object to render from: \"\(text)\". Return object name, color, shape.",
                 generating: RenderExtraction.self
             )
-            return buildFromExtraction(extraction, routerResult: routerResult)
+            return buildFromExtraction(retryResponse.content, routerResult: routerResult)
         } catch {
             logger.error("LLM extraction repair retry also failed: \(error.localizedDescription)")
             // Reset session for next call
@@ -192,7 +192,6 @@ final class RenderPipeline {
     private func findPreset(from objectName: String) -> RenderPreset? {
         let lower = objectName.lowercased()
         let presetMap: [String: RenderPreset] = [
-            "pyramid": .volcano, // volcano has cone shape, but pyramid is its own
             "atom": .atom, "molecule": .molecule,
             "water": .waterMolecule, "h2o": .waterMolecule,
             "cell": .cell, "dna": .dna,
@@ -204,6 +203,10 @@ final class RenderPipeline {
             "earth": .earth, "mars": .mars, "saturn": .saturn,
             "jupiter": .jupiter, "moon": .moon, "sun": .sun, "star": .star,
             "solar system": .solarSystem,
+            "microscope": .microscope, "telescope": .telescope,
+            "compass": .compass, "prism": .prism,
+            "black hole": .blackHole, "rocket": .rocket,
+            "fossil": .fossil, "battery": .battery
         ]
         for (key, preset) in presetMap {
             if lower.contains(key) { return preset }
@@ -242,31 +245,14 @@ final class RenderPipeline {
     // MARK: - Execution
 
     /// Executes the render request and produces output.
-    /// For 3D: instant JSON config for GeometryView.
-    /// For 2D: attempts ImagePlayground, falls back to 3D if unavailable.
+    /// All rendering is 3D (SceneKit) for guaranteed instant, offline reliability.
     private func execute(_ request: RenderRequest) -> RenderOutput {
-        switch request.mode {
-        case .object3d:
-            return execute3D(request)
-
-        case .image:
-            // 2D rendering depends on ImagePlayground which may not be available.
-            // For reliability, we produce a 3D fallback immediately.
-            // The image can be generated asynchronously and attached later if needed.
-            // For now, prefer 3D for guaranteed instant rendering.
-            if request.preset != nil || request.primitive != nil {
-                // Has a shape we can render in 3D — do that for instant feedback
-                var request3D = request
-                request3D.mode = .object3d
-                return execute3D(request3D)
-            }
-            return execute3D(request)
-        }
+        execute3D(request)
     }
 
     /// Produces a 3D render output (instant, always succeeds)
     private func execute3D(_ request: RenderRequest) -> RenderOutput {
-        let config: [String: Any] = [
+        var config: [String: Any] = [
             "shape": request.resolvedPrimitive.rawValue,
             "color": request.color.sceneKitName,
             "scale": request.size.scaleValue,
@@ -274,8 +260,16 @@ final class RenderPipeline {
             "caption": request.labelText ?? "",
         ]
 
-        let jsonData = try! JSONSerialization.data(withJSONObject: config, options: [])
-        let jsonString = String(data: jsonData, encoding: .utf8)!
+        // Pass preset name so GeometryView can build composite scenes
+        if let preset = request.preset {
+            config["preset"] = preset.rawValue
+        }
+
+        // Safe serialization — return fallback output if config can't be encoded
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: config),
+              let jsonString = String(data: jsonData, encoding: .utf8) else {
+            return .fallback
+        }
 
         let summary = buildSpokenSummary(request)
 
@@ -297,15 +291,10 @@ final class RenderPipeline {
         let name = request.preset?.spanishName ?? request.labelText ?? request.concept
         let colorName = spanishColorName(request.color)
 
-        switch request.mode {
-        case .object3d:
-            let base = "Aquí tienes: \(name) en \(colorName)"
-            let suffix = request.animation != .none ? ". Puedes girarlo con el dedo." : "."
-            let full = base + suffix
-            return String(full.prefix(120))
-        case .image:
-            return String("Aquí tienes una imagen de: \(name).".prefix(120))
-        }
+        let base = "Aquí tienes: \(name) en \(colorName)"
+        let suffix = request.animation != .none ? ". Puedes girarlo con el dedo." : "."
+        let full = base + suffix
+        return String(full.prefix(120))
     }
 
     private func spanishColorName(_ color: RenderColor) -> String {
