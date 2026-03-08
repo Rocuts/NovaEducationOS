@@ -44,21 +44,46 @@ class UserSettings {
     /// Número de días inactivos antes de volver
     var daysInactiveBeforeReturn: Int
 
+    @Transient private var _cachedLevel: Int?
+    @Transient private var _cachedProgress: Double?
+    @Transient private var _cachedXpNext: Int?
+    @Transient private var _lastXpRecalculated: Int = -1
+
     // MARK: - Computed Properties
 
     /// Nivel actual calculado desde XP total
     var currentLevel: Int {
-        PlayerLevel.level(fromTotalXP: totalXP)
+        if totalXP == _lastXpRecalculated, let cached = _cachedLevel { return cached }
+        let level = PlayerLevel.level(fromTotalXP: totalXP)
+        updateCaches(level: level)
+        return level
     }
 
     /// Progreso hacia el siguiente nivel (0.0 - 1.0)
     var levelProgress: Double {
-        PlayerLevel.progress(forTotalXP: totalXP)
+        if totalXP == _lastXpRecalculated, let cached = _cachedProgress { return cached }
+        let _ = currentLevel // forces cache update
+        return _cachedProgress ?? 0.0
     }
 
     /// XP necesario para el siguiente nivel
     var xpToNextLevel: Int {
-        PlayerLevel.xpToNextLevel(fromTotalXP: totalXP)
+        if totalXP == _lastXpRecalculated, let cached = _cachedXpNext { return cached }
+        let _ = currentLevel // forces cache update
+        return _cachedXpNext ?? 100
+    }
+
+    private func updateCaches(level: Int) {
+        _cachedLevel = level
+        
+        // Use PlayerLevel class methods directly for boundary calculation
+        let progressVal = PlayerLevel.progress(forTotalXP: totalXP)
+        _cachedProgress = progressVal
+        
+        let xpNext = PlayerLevel.xpToNextLevel(fromTotalXP: totalXP)
+        _cachedXpNext = xpNext
+        
+        _lastXpRecalculated = totalXP
     }
 
     /// Título del jugador

@@ -538,10 +538,10 @@ Se usan tres frameworks de test simultáneamente:
 
 | Requisito | Estado | Deadline |
 |-----------|--------|----------|
-| Age rating actualizado (nuevas categorías 13+, 16+, 18+) | PENDIENTE | 31 enero 2026 (posiblemente ya vencido) |
-| Build con iOS 26 SDK | VERIFICAR | Abril 2026 |
-| COPPA compliance (si target incluye < 13 años) | EVALUAR | Continuo |
-| Privacy Nutrition Labels actualizados | VERIFICAR | Continuo |
+| Age rating actualizado (nuevas categorías 13+, 16+, 18+) | COMPLETADO | 31 enero 2026 (posiblemente ya vencido) |
+| Build con iOS 26 SDK | VERIFICADO | Abril 2026 |
+| COPPA compliance (si target incluye < 13 años) | COMPLETADO | Continuo |
+| Privacy Nutrition Labels actualizados | PENDIENTE DE PUBLICADOR | Continuo |
 | Migración a Swift 6 | BACKLOG | Sin deadline pero recomendado |
 
 ### Context Window Management (4,096 tokens)
@@ -634,12 +634,12 @@ La auditoría también identificó múltiples áreas de excelencia:
 
 | # | Acción | Archivo | Esfuerzo |
 |---|--------|---------|----------|
-| 18 | Fix bracket regex en VoiceModeManager | VoiceModeManager.swift | Bajo |
-| 19 | Limpiar lastRenderRequest al cambiar materia | RenderPipeline.swift, ChatViewModel.swift | Bajo |
-| 20 | Cache de computed properties en UserSettings | UserSettings.swift | Bajo |
-| 21 | Implementar context window summarization | FoundationModelService.swift | Alto |
-| 22 | Evaluar compliance COPPA y age rating | Documentación | Medio |
-| 23 | Convertir LearningStep a @Model | StudentKnowledge.swift | Medio |
+| ~~18~~ | ~~Fix bracket regex en VoiceModeManager~~ | `VoiceModeManager.swift` | ~~Bajo~~ |
+| ~~19~~ | ~~Limpiar lastRenderRequest al cambiar materia~~ | `RenderPipeline.swift`, `ChatViewModel.swift` | ~~Bajo~~ |
+| ~~20~~ | ~~Cache de computed properties en UserSettings~~ | `UserSettings.swift` | ~~Bajo~~ |
+| ~~21~~ | ~~Implementar context window summarization~~ | `FoundationModelService.swift` | ~~Alto~~ |
+| 22 | Convertir LearningStep a @Model | StudentKnowledge.swift | Medio |
+| ~~23~~ | ~~Evaluar compliance COPPA y age rating~~ | Documentación | ~~Medio~~ |
 
 ---
 

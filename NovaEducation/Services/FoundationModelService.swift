@@ -58,6 +58,10 @@ final class FoundationModelService {
     /// Session prewarming task — cancelled when session is recreated
     private var prewarmTask: Task<Void, Never>?
 
+    /// Estimated character count of current session's context to enable proactive summarization at ~70% capacity
+    private var sessionCharCount: Int = 0
+    private let charCapacityThreshold: Int = 11_000 // roughly 70% of 4096 tokens (≈ 16,000 chars)
+
     /// Generation options: greedy for tool-calling sessions (more deterministic tool selection)
     private var generationOptions: GenerationOptions {
         sessionHasTools
@@ -128,6 +132,9 @@ final class FoundationModelService {
         // Any new session lifecycle cancels previous prewarm
         prewarmTask?.cancel()
         prewarmTask = nil
+
+        // Reset tracked char capacity count
+        sessionCharCount = 0
 
         // Build student knowledge context if we have a model context
         if let context = modelContext {
@@ -359,6 +366,8 @@ final class FoundationModelService {
                         for: prompt,
                         interactionMode: interactionMode
                     )
+                    self.sessionCharCount += promptPayload.count
+
                     let stream = session.streamResponse(to: promptPayload, options: self.generationOptions)
 
                     var lastRawCount = 0
@@ -408,6 +417,9 @@ final class FoundationModelService {
                             continuation.yield(cleanedDelta)
                         }
                     }
+
+                    // Count response length in tracker
+                    self.sessionCharCount += lastRawCount
 
                     continuation.finish()
                 } catch {
@@ -579,7 +591,11 @@ final class FoundationModelService {
                 for: prompt,
                 interactionMode: interactionMode
             )
+            self.sessionCharCount += payload.count
+            
             let response = try await session.respond(to: payload, options: generationOptions)
+            self.sessionCharCount += response.content.count
+            
             return cleanResponseText(response.content)
         } catch {
             if isExceededContextWindowError(error), let subject = self.currentSubject {
@@ -624,7 +640,12 @@ final class FoundationModelService {
             throw NovaError.noSession
         }
 
-        if session == nil || currentInteractionMode != interactionMode {
+        let isOverCapacity = sessionCharCount >= charCapacityThreshold
+
+        if session == nil || currentInteractionMode != interactionMode || isOverCapacity {
+            if isOverCapacity {
+                logger.info("Session reached 70% capacity (\(self.sessionCharCount) chars). Recreating with summarized history.")
+            }
             createSession(
                 for: subject,
                 studentName: studentName,

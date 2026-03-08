@@ -381,4 +381,9 @@ final class RenderPipeline {
     func resetExtractionSession() {
         extractionSession = nil
     }
+
+    /// Clears the last render request, useful when switching subjects
+    func clearLastRenderRequest() {
+        lastRenderRequest = nil
+    }
 }
