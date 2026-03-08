@@ -14,22 +14,9 @@
 		C769836D2F2124A1007FFCE3 /* NovaEducation.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NovaEducation.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		C73BDF342F21DB5500405EC9 /* Exceptions for "NovaEducation" folder in "NovaEducation" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = C769836C2F2124A1007FFCE3 /* NovaEducation */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		C769836F2F2124A1007FFCE3 /* NovaEducation */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				C73BDF342F21DB5500405EC9 /* Exceptions for "NovaEducation" folder in "NovaEducation" target */,
-			);
 			path = NovaEducation;
 			sourceTree = "<group>";
 		};
