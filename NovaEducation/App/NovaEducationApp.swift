@@ -12,7 +12,7 @@ struct NovaEducationApp: App {
     private let needsDataResetAlert: Bool
 
     init() {
-        let schema = Schema(SchemaV2.models)
+        let schema = Schema(SchemaV1.models)
 
         // Configuration for the main persistent store
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -22,7 +22,6 @@ struct NovaEducationApp: App {
         do {
             resolvedContainer = try ModelContainer(
                 for: schema,
-                migrationPlan: NovaEducationMigrationPlan.self,
                 configurations: [modelConfiguration]
             )
         } catch {
@@ -33,7 +32,6 @@ struct NovaEducationApp: App {
             do {
                 resolvedContainer = try ModelContainer(
                     for: schema,
-                    migrationPlan: NovaEducationMigrationPlan.self,
                     configurations: [fallbackConfig]
                 )
             } catch {

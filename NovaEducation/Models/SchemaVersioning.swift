@@ -26,6 +26,7 @@ enum SchemaV1: VersionedSchema {
 // MARK: - Schema V2
 
 /// First schema migration template. Mirror V1 to establish a stable state.
+/*
 enum SchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
 
@@ -44,11 +45,13 @@ enum SchemaV2: VersionedSchema {
         ]
     }
 }
+*/
 
 // MARK: - Migration Plan
 
 /// Central migration plan for NovaEducation's SwiftData store.
 /// Add new schema versions to `schemas` and corresponding `MigrationStage` entries to `stages`.
+/*
 enum NovaEducationMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [SchemaV1.self, SchemaV2.self]
@@ -63,3 +66,4 @@ enum NovaEducationMigrationPlan: SchemaMigrationPlan {
         toVersion: SchemaV2.self
     )
 }
+*/
