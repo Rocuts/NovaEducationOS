@@ -31,6 +31,7 @@ struct AuroraBackgroundView: View {
         }
         .ignoresSafeArea()
         .opacity(intensity)
+        .accessibilityHidden(true)
     }
 }
 

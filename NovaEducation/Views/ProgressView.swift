@@ -26,34 +26,7 @@ struct StudentProgressView: View {
     }
 
     private var currentStreak: Int {
-        var streak = 0
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-
-        guard !activities.isEmpty else { return 0 }
-        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return 0 }
-
-        let mostRecent = activities[0].date
-        if !calendar.isDate(mostRecent, inSameDayAs: today) &&
-            !calendar.isDate(mostRecent, inSameDayAs: yesterday) {
-            return 0
-        }
-
-        var currentDate = mostRecent
-        streak = 1
-
-        for i in 1..<activities.count {
-            let previousActivityDate = activities[i].date
-            if let expectedDate = calendar.date(byAdding: .day, value: -1, to: currentDate),
-               calendar.isDate(previousActivityDate, inSameDayAs: expectedDate) {
-                streak += 1
-                currentDate = previousActivityDate
-            } else {
-                break
-            }
-        }
-
-        return streak
+        DailyActivity.currentStreak(from: activities)
     }
 
     var uniqueSubjectsCount: Int {
@@ -68,38 +41,67 @@ struct StudentProgressView: View {
         XPManager.shared.xpGainedToday(context: modelContext)
     }
 
+    private var hasActivity: Bool {
+        !sessions.isEmpty || !activities.isEmpty || settings.totalMessages > 0
+    }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: Nova.Spacing.sectionGap) {
-                xpProgressSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 20)
-                    .animation(Nova.Animation.stagger(index: 0), value: sectionsAppeared)
+            if hasActivity {
+                VStack(spacing: Nova.Spacing.sectionGap) {
+                    xpProgressSection
+                        .opacity(sectionsAppeared ? 1 : 0)
+                        .offset(y: sectionsAppeared ? 0 : 20)
+                        .animation(Nova.Animation.stagger(index: 0), value: sectionsAppeared)
 
-                streakMultiplierSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 20)
-                    .animation(Nova.Animation.stagger(index: 1), value: sectionsAppeared)
+                    streakMultiplierSection
+                        .opacity(sectionsAppeared ? 1 : 0)
+                        .offset(y: sectionsAppeared ? 0 : 20)
+                        .animation(Nova.Animation.stagger(index: 1), value: sectionsAppeared)
 
-                statsSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 20)
-                    .animation(Nova.Animation.stagger(index: 2), value: sectionsAppeared)
+                    statsSection
+                        .opacity(sectionsAppeared ? 1 : 0)
+                        .offset(y: sectionsAppeared ? 0 : 20)
+                        .animation(Nova.Animation.stagger(index: 2), value: sectionsAppeared)
 
-                weeklyProgressSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 20)
-                    .animation(Nova.Animation.stagger(index: 3), value: sectionsAppeared)
+                    weeklyProgressSection
+                        .opacity(sectionsAppeared ? 1 : 0)
+                        .offset(y: sectionsAppeared ? 0 : 20)
+                        .animation(Nova.Animation.stagger(index: 3), value: sectionsAppeared)
 
-                achievementsSection
-                    .opacity(sectionsAppeared ? 1 : 0)
-                    .offset(y: sectionsAppeared ? 0 : 20)
-                    .animation(Nova.Animation.stagger(index: 4), value: sectionsAppeared)
+                    achievementsSection
+                        .opacity(sectionsAppeared ? 1 : 0)
+                        .offset(y: sectionsAppeared ? 0 : 20)
+                        .animation(Nova.Animation.stagger(index: 4), value: sectionsAppeared)
+                }
+                .padding()
+                .onAppear { sectionsAppeared = true }
             }
-            .padding()
-            .onAppear { sectionsAppeared = true }
         }
         .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
+        .overlay {
+            if !hasActivity {
+                VStack(spacing: Nova.Spacing.xl) {
+                    Image(systemName: "graduationcap")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.blue.opacity(0.6))
+                        .symbolEffect(.pulse, options: .repeating.speed(0.5))
+
+                    VStack(spacing: Nova.Spacing.sm) {
+                        Text("Tu aventura comienza aquí")
+                            .font(.title3.bold())
+
+                        Text("Envía tu primer mensaje a Nova para\nempezar a ganar XP y desbloquear logros.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.horizontal, Nova.Spacing.jumbo)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(backgroundGradient)
+            }
+        }
         .background(backgroundGradient)
         .navigationTitle("Tu Progreso")
         .navigationBarTitleDisplayMode(.large)

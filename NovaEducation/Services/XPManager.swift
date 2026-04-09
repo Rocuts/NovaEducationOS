@@ -205,23 +205,7 @@ final class XPManager {
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         guard let activities = try? context.fetch(descriptor) else { return 0 }
-
-        var streak = 0
-        var expectedDate = Calendar.current.startOfDay(for: Date())
-
-        for activity in activities {
-            let activityDate = Calendar.current.startOfDay(for: activity.date)
-
-            if activityDate == expectedDate && activity.wasActive {
-                streak += 1
-                expectedDate = Calendar.current.date(byAdding: .day, value: -1, to: expectedDate) ?? expectedDate
-            } else if activityDate < expectedDate {
-                // Día saltado, racha rota
-                break
-            }
-        }
-
-        return streak
+        return DailyActivity.currentStreak(from: activities)
     }
 
     private func countSubjectsThisWeek(context: ModelContext) -> Int {

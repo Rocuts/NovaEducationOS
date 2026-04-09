@@ -31,30 +31,46 @@ struct SearchView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: Nova.Spacing.lg) {
-                if searchText.isEmpty {
-                    // Estado inicial: mostrar todas las materias
-                    subjectResultsSection(title: "Todas las materias", subjects: filteredSubjects)
-                } else if !hasResults {
-                    emptyStateView
-                } else {
-                    // Resultados de materias
-                    if !filteredSubjects.isEmpty {
-                        subjectResultsSection(title: "Materias", subjects: filteredSubjects)
-                    }
+        ZStack {
+            backgroundGradient
 
-                    // Resultados de chats
-                    if !filteredMessages.isEmpty {
-                        chatResultsSection
+            if !searchText.isEmpty && !hasResults {
+                VStack(spacing: Nova.Spacing.xl) {
+                    Image(systemName: "text.magnifyingglass")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.secondary)
+
+                    VStack(spacing: Nova.Spacing.sm) {
+                        Text("Sin resultados para \"\(searchText)\"")
+                            .font(.title3.bold())
+
+                        Text("Prueba con otras palabras o revisa la ortografía")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
                 }
+                .padding(.horizontal, Nova.Spacing.jumbo)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: Nova.Spacing.lg) {
+                        if searchText.isEmpty {
+                            subjectResultsSection(title: "Todas las materias", subjects: filteredSubjects)
+                        } else {
+                            if !filteredSubjects.isEmpty {
+                                subjectResultsSection(title: "Materias", subjects: filteredSubjects)
+                            }
+                            if !filteredMessages.isEmpty {
+                                chatResultsSection
+                            }
+                        }
+                    }
+                    .padding()
+                    .onAppear { resultsAppeared = true }
+                }
+                .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
             }
-            .padding()
-            .onAppear { resultsAppeared = true }
         }
-        .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
-        .background(backgroundGradient)
         .navigationTitle("Buscar")
         .searchable(text: $searchText, prompt: "Buscar materia o en tus conversaciones...")
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
@@ -106,24 +122,6 @@ struct SearchView: View {
                 }
             }
         }
-    }
-
-    // MARK: - Empty State
-    private var emptyStateView: some View {
-        VStack(spacing: Nova.Spacing.lg) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-
-            Text("No se encontraron resultados")
-                .font(.headline)
-
-            Text("Prueba con otras palabras o revisa la ortografía")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Nova.Spacing.ultra)
     }
 
     // MARK: - Background

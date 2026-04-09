@@ -360,6 +360,9 @@ struct CompactQuestsCard: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Nova.Radius.lg))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Misiones de Hoy. \(quests.filter { $0.isCompleted }.count) de \(quests.count) completadas")
+        .accessibilityHint("Toca dos veces para ver las misiones")
     }
 }
 

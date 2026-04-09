@@ -264,6 +264,18 @@ struct ChatView: View {
                 scrollToBottom(proxy: proxy)
             }
         }
+        .mask(
+            VStack(spacing: 0) {
+                // Fade superior: mensajes se disuelven hacia el header glass
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 28)
+                // Contenido visible completo
+                Rectangle()
+                // Fade inferior: mensajes se disuelven hacia el input area
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 28)
+            }
+        )
     }
 
     // MARK: - Welcome Message
@@ -731,8 +743,8 @@ struct ChatView: View {
         // Capture container to create a background context
         let container = modelContext.container
         
-        Task.detached(priority: .userInitiated) {
-            await BackgroundSessionManager.shared.initializeSession(container: container)
+        Task {
+            BackgroundSessionManager.shared.initializeSession(container: container)
         }
     }
 

@@ -155,6 +155,7 @@ struct VoiceModeView: View {
                 didConfigure = true
             }
             try? await Task.sleep(for: .seconds(0.5))
+            guard !Task.isCancelled else { return }
             voiceManager.startSession()
         }
         .onDisappear {
@@ -162,23 +163,4 @@ struct VoiceModeView: View {
         }
     }
     
-    private var stateColor: Color {
-        switch voiceManager.state {
-        case .idle: return .gray
-        case .listening: return .cyan
-        case .processing: return .purple
-        case .speaking: return .green // Or orange/warm for Nova voice
-        case .error: return .red
-        }
-    }
-    
-    private var statusText: String {
-        switch voiceManager.state {
-        case .idle: return "Toca para hablar"
-        case .listening: return "Escuchando..."
-        case .processing: return "Pensando..."
-        case .speaking: return "Nova" // Or speaking indicator
-        case .error(let msg): return msg
-        }
-    }
 }

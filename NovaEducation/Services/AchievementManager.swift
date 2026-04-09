@@ -365,23 +365,7 @@ final class AchievementManager {
     // MARK: - Helper Methods
 
     private func calculateCurrentStreak(activities: [DailyActivity]) -> Int {
-        // Activities are already sorted by date descending from fetchDailyActivities
-        let calendar = Calendar.current
-        var streak = 0
-        var expectedDate = calendar.startOfDay(for: Date())
-
-        for activity in activities {
-            let activityDate = calendar.startOfDay(for: activity.date)
-
-            if activityDate == expectedDate && activity.wasActive {
-                streak += 1
-                expectedDate = calendar.date(byAdding: .day, value: -1, to: expectedDate) ?? expectedDate
-            } else if activityDate < expectedDate {
-                break
-            }
-        }
-
-        return streak
+        DailyActivity.currentStreak(from: activities)
     }
 
     // MARK: - Data Fetching

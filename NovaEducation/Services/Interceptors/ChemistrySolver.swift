@@ -338,7 +338,7 @@ struct ChemistrySolver: SubjectInterceptor, Sendable {
         let answer = "Masa molar de \(formula) = \(formattedMass) g/mol"
 
         let breakdownStr = breakdown.map { item in
-            "\(item.symbol)\(item.count > 1 ? String(item.count) : ""): \(item.count) x \(formatMass(Self.bySymbol[item.symbol]!.atomicMass)) = \(formatMass(item.mass))"
+            "\(item.symbol)\(item.count > 1 ? String(item.count) : ""): \(item.count) x \(formatMass(Self.bySymbol[item.symbol]?.atomicMass ?? 0)) = \(formatMass(item.mass))"
         }.joined(separator: " + ")
 
         let breakdownJSON = breakdown.map { item in

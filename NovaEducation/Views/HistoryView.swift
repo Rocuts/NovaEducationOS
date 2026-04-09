@@ -25,53 +25,52 @@ struct HistoryView: View {
     @State private var rowsAppeared = false
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: Nova.Spacing.md) {
-                if recentConversations.isEmpty {
-                    emptyStateView
-                } else {
-                    ForEach(Array(recentConversations.enumerated()), id: \.element.subject.id) { index, conversation in
-                        ConversationRow(
-                            subject: conversation.subject,
-                            lastMessage: conversation.lastMessage,
-                            messageCount: conversation.messageCount
-                        ) {
-                            selectedSubject = conversation.subject
-                        }
-                        .opacity(rowsAppeared ? 1 : 0)
-                        .offset(y: rowsAppeared ? 0 : 20)
-                        .animation(Nova.Animation.stagger(index: index), value: rowsAppeared)
+        ZStack {
+            backgroundGradient
+
+            if recentConversations.isEmpty {
+                VStack(spacing: Nova.Spacing.xl) {
+                    Image(systemName: "bubble.left.and.text.bubble.right")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.blue.opacity(0.6))
+                        .symbolEffect(.pulse, options: .repeating.speed(0.5))
+
+                    VStack(spacing: Nova.Spacing.sm) {
+                        Text("Sin conversaciones aún")
+                            .font(.title3.bold())
+
+                        Text("Tus conversaciones con Nova aparecerán aquí.\nElige una materia en Inicio para comenzar.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
                 }
+                .padding(.horizontal, Nova.Spacing.jumbo)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: Nova.Spacing.md) {
+                        ForEach(Array(recentConversations.enumerated()), id: \.element.subject.id) { index, conversation in
+                            ConversationRow(
+                                subject: conversation.subject,
+                                lastMessage: conversation.lastMessage,
+                                messageCount: conversation.messageCount
+                            ) {
+                                selectedSubject = conversation.subject
+                            }
+                            .opacity(rowsAppeared ? 1 : 0)
+                            .offset(y: rowsAppeared ? 0 : 20)
+                            .animation(Nova.Animation.stagger(index: index), value: rowsAppeared)
+                        }
+                    }
+                    .padding()
+                    .onAppear { rowsAppeared = true }
+                }
+                .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
             }
-            .padding()
-            .onAppear { rowsAppeared = true }
         }
-        .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
-        .background(backgroundGradient)
         .navigationTitle("Historial")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-    }
-
-    // MARK: - Empty State
-    private var emptyStateView: some View {
-        VStack(spacing: Nova.Spacing.lg) {
-            Image(systemName: "clock.arrow.circlepath")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-                .symbolEffect(.pulse, options: .repeating)
-
-            Text("Sin conversaciones")
-                .font(.headline)
-
-            Text("Inicia tu primera conversación eligiendo una materia")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Nova.Spacing.ultra)
     }
 
     // MARK: - Background

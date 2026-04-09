@@ -482,6 +482,10 @@ struct SettingsToggleRow: View {
         }
         .padding(.horizontal, Nova.Spacing.lg)
         .padding(.vertical, Nova.Spacing.sm)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(subtitle)")
+        .accessibilityValue(isOn ? "activado" : "desactivado")
+        .accessibilityAddTraits(.isToggle)
     }
 }
 

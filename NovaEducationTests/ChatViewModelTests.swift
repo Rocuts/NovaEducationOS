@@ -52,10 +52,6 @@ struct ChatViewModelTests {
         #expect(!viewModel.showLevelUpCelebration)
         #expect(viewModel.previousLevel == 0)
 
-        viewModel.showXPToast = true
-        viewModel.dismissXPToast()
-        #expect(!viewModel.showXPToast)
-
         viewModel.errorMessage = "Error"
         viewModel.errorRecoverySuggestion = "Try again"
         viewModel.dismissError()

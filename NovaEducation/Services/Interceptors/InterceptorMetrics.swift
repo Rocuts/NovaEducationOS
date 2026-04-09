@@ -111,7 +111,7 @@ enum InterceptorMetrics {
         }
 
         logger.info(
-            "[\(interceptorId)] \(result.category.displayName) conf=\(String(format: "%.1f", result.confidence)) \(durationMs)ms — \(String(utterance.prefix(50)))"
+            "[\(interceptorId)] \(result.category.displayName) conf=\(String(format: "%.1f", result.confidence)) \(durationMs)ms — \(String(utterance.prefix(50)), privacy: .private)"
         )
     }
 

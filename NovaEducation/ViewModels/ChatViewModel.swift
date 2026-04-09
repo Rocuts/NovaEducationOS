@@ -37,9 +37,6 @@ class ChatViewModel {
     /// Nuevo título si hubo level up
     var newTitle: String = ""
 
-    /// Si debemos mostrar toast de XP (deprecated - ahora usa IslandNotification)
-    var showXPToast: Bool = false
-
     /// Si debemos mostrar explosion de particulas para XP grandes o level up
     var showParticleExplosion: Bool = false
 
@@ -514,11 +511,6 @@ class ChatViewModel {
         didLevelUp = false
         previousLevel = 0
         XPManager.shared.resetAnimationState()
-    }
-
-    /// Resetea el toast de XP
-    func dismissXPToast() {
-        showXPToast = false
     }
 
     /// Limpia el estado de error

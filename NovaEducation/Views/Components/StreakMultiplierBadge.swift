@@ -260,6 +260,8 @@ struct CompactStreakBadge: View {
                 flameGlow = true
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Racha de \(streakDays) días. Multiplicador \(String(format: "%.1f", multiplier))")
     }
 }
 

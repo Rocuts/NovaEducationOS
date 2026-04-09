@@ -2,62 +2,60 @@ import Foundation
 import SwiftData
 import os
 
-/// Actor responsible for handling background session initialization tasks
-/// to prevent Main Thread hangs.
-actor BackgroundSessionManager {
+/// Handles background session initialization tasks (daily activity, achievement seeding, image cleanup).
+/// All SwiftData work runs on MainActor since ModelContext is MainActor-bound.
+@MainActor
+final class BackgroundSessionManager {
     static let shared = BackgroundSessionManager()
 
     private nonisolated let logger = Logger(subsystem: "com.nova.education", category: "BackgroundSession")
 
     private init() {}
 
-    func initializeSession(container: ModelContainer) async {
-        await MainActor.run {
-            let context = ModelContext(container)
-            context.autosaveEnabled = false
+    func initializeSession(container: ModelContainer) {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
 
-            // 1. Update Daily Activity
-            let today = Calendar.current.startOfDay(for: Date())
-            let descriptor = FetchDescriptor<DailyActivity>(predicate: #Predicate { $0.date == today })
+        // 1. Update Daily Activity
+        let today = Calendar.current.startOfDay(for: Date())
+        let descriptor = FetchDescriptor<DailyActivity>(predicate: #Predicate { $0.date == today })
 
-            if (try? context.fetch(descriptor).first) == nil {
-                let newActivity = DailyActivity(date: Date(), wasActive: true)
-                context.insert(newActivity)
-            }
+        if (try? context.fetch(descriptor).first) == nil {
+            let newActivity = DailyActivity(date: Date(), wasActive: true)
+            context.insert(newActivity)
+        }
 
-            // 2. Initialize achievements if needed (Seeding)
-            let achDescriptor = FetchDescriptor<Achievement>()
-            if let existing = try? context.fetch(achDescriptor) {
-                let existingIds = Set(existing.map { $0.id })
+        // 2. Initialize achievements if needed (Seeding)
+        let achDescriptor = FetchDescriptor<Achievement>()
+        if let existing = try? context.fetch(achDescriptor) {
+            let existingIds = Set(existing.map { $0.id })
 
-                for type in AchievementType.allCases {
-                    if !existingIds.contains(type.rawValue) {
-                        let achievement = Achievement(
-                            id: type.rawValue,
-                            isUnlocked: false,
-                            progress: 0,
-                            targetValue: type.targetValue
-                        )
-                        context.insert(achievement)
-                    }
+            for type in AchievementType.allCases {
+                if !existingIds.contains(type.rawValue) {
+                    let achievement = Achievement(
+                        id: type.rawValue,
+                        isUnlocked: false,
+                        progress: 0,
+                        targetValue: type.targetValue
+                    )
+                    context.insert(achievement)
                 }
             }
+        }
 
-            // 3. Clean up orphaned and old generated images
-            cleanupGeneratedImages(context: context)
+        // 3. Clean up orphaned and old generated images
+        cleanupGeneratedImages(context: context)
 
-            do {
-                try context.save()
-            } catch {
-                logger.error("Failed to save: \(error.localizedDescription, privacy: .public)")
-            }
+        do {
+            try context.save()
+        } catch {
+            logger.error("Failed to save: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     // MARK: - Image Cleanup
 
     /// Deletes orphaned images not referenced by any ChatMessage and images older than 30 days.
-    @MainActor
     private func cleanupGeneratedImages(context: ModelContext) {
         let imagesDir = URL.documentsDirectory.appending(path: "GeneratedImages")
         let fm = FileManager.default
@@ -93,7 +91,7 @@ actor BackgroundSessionManager {
         }
     }
 
-    static func referencedImageFilenames(from messages: [ChatMessage]) -> Set<String> {
+    nonisolated static func referencedImageFilenames(from messages: [ChatMessage]) -> Set<String> {
         Set(messages.compactMap { message -> String? in
             guard let rawReference = message.imageURLString else { return nil }
             let normalized = normalizedImageFilename(from: rawReference)
@@ -101,7 +99,7 @@ actor BackgroundSessionManager {
         })
     }
 
-    static func normalizedImageFilename(from rawReference: String) -> String {
+    nonisolated static func normalizedImageFilename(from rawReference: String) -> String {
         if rawReference.hasPrefix("file://"), let url = URL(string: rawReference) {
             return url.lastPathComponent
         }
