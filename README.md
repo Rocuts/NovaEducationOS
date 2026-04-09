@@ -1,6 +1,8 @@
 # NovaEducation
 
-An iOS application that integrates a fully offline large language model to deliver personalized academic tutoring for children. Built on Apple's Foundation Models framework, all AI inference runs entirely on the device's Neural Engine — no student data is transmitted externally, no cloud API is called, and no internet connection is required. The system implements layered safety mitigations including input validation, prompt injection hardening, content moderation, PII detection, and privacy preservation by architectural design, making it suitable for unsupervised use by minors.
+An iOS application that runs a large language model entirely offline and locally on the device to deliver personalized academic tutoring for children. Built on Apple's Foundation Models framework, all AI inference executes on the device's Neural Engine — no cloud API, no server, no internet connection, no data transmission of any kind. The system implements layered safety mitigations including input validation, prompt injection hardening, content moderation, PII detection, and privacy preservation by architectural design, making it suitable for unsupervised use by minors.
+
+> **Local & Offline LLM**: NovaEducation runs a large language model directly on the user's device via Apple's Neural Engine. There is no cloud dependency — the model is embedded in the operating system, inference happens locally, and the application functions with zero network connectivity. This is not a client that calls a remote API; the entire AI pipeline — text generation, streaming, tool calling, image generation, speech recognition, and text-to-speech — executes on-device. No student data is ever transmitted, collected, or made accessible to any external service, including the developer.
 
 ## Table of Contents
 
