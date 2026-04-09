@@ -4,8 +4,13 @@ An iOS application that runs a large language model entirely offline and locally
 
 > **Local & Offline LLM**: NovaEducation runs a large language model directly on the user's device via Apple's Neural Engine. There is no cloud dependency — the model is embedded in the operating system, inference happens locally, and the application functions with zero network connectivity. This is not a client that calls a remote API; the entire AI pipeline — text generation, streaming, tool calling, image generation, speech recognition, and text-to-speech — executes on-device. No student data is ever transmitted, collected, or made accessible to any external service, including the developer.
 
+## Research Context
+
+NovaEducation is not only a consumer application — it serves as an empirical testbed for studying how safety mitigations behave in AI systems deployed for children. Building a production system where a language model interacts autonomously with minors — generating content, invoking tools, and storing knowledge without human oversight per interaction — surfaces safety questions that are difficult to study in isolation: How effective is prompt hardening when the untrusted input comes from a child who has no adversarial intent but unpredictable behavior? How should agentic tool calling be bounded when the user population cannot evaluate the model's autonomous decisions? What privacy-preserving patterns are sufficient when the architecture must protect users who cannot consent for themselves? This project was built to confront those questions with working code, not theoretical frameworks, and the safety mechanisms implemented here — layered input validation, structural prompt isolation, deterministic routing to reduce hallucination surface, and bounded autonomous tool execution — represent engineering decisions driven by the specific risks of deploying AI in high-severity contexts involving children.
+
 ## Table of Contents
 
+- [Research Context](#research-context)
 - [Safety Architecture](#safety-architecture)
 - [On-Device AI Integration](#on-device-ai-integration)
 - [Purpose](#purpose)
