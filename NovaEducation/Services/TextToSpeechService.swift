@@ -6,7 +6,7 @@ private let logger = Logger(subsystem: "com.nova.education", category: "TextToSp
 
 @Observable
 @MainActor
-class TextToSpeechService: NSObject, AVSpeechSynthesizerDelegate {
+class TextToSpeechService: NSObject, @preconcurrency AVSpeechSynthesizerDelegate {
     var isSpeaking = false
     var currentlySpeakingID: UUID?
     private let synthesizer = AVSpeechSynthesizer()

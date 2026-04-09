@@ -90,7 +90,7 @@ struct MainTabView: View {
                 .background(Color(uiColor: .systemBackground))
             }
         }
-        .preferredColorScheme(settings?.preferredTheme.colorScheme ?? .light)
+        .preferredColorScheme(settings?.preferredTheme.colorScheme)
         .overlay {
             // Sistema de notificaciones premium — emerge del Dynamic Island
             IslandNotificationContainer()

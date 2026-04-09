@@ -157,7 +157,7 @@ struct ChatView: View {
                 viewModel.currentInput = String(newValue.prefix(4000))
             }
         }
-        .alert("Error", isPresented: Binding(
+        .alert("Algo salió mal", isPresented: Binding(
             get: { viewModel.errorMessage != nil },
             set: { if !$0 { viewModel.dismissError() } }
         )) {
@@ -299,7 +299,7 @@ struct ChatView: View {
                         .foregroundStyle(.primary)
                 }
 
-                Text("Soy Nova, tu tutora personal. Preguntame lo que necesites y te ayudare paso a paso.")
+                Text("Soy Nova, tu tutora personal. Pregúntame lo que necesites y te ayudaré paso a paso.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -400,7 +400,8 @@ struct ChatView: View {
                              sendLockedRecording()
                          } label: {
                              Image(systemName: "arrow.up.circle.fill")
-                                 .font(.system(size: 32))
+                                 .font(.largeTitle)
+                                 .imageScale(.large)
                                  .foregroundStyle(subject.color)
                          }
                          .accessibilityLabel("Enviar grabación")
@@ -496,7 +497,7 @@ struct ChatView: View {
                                         .frame(width: 44, height: 44)
                                         .overlay {
                                             Image(systemName: "arrow.up")
-                                                .font(.system(size: 16, weight: .bold))
+                                                .font(.callout.bold())
                                                 .foregroundStyle(.white)
                                         }
                                 }
@@ -531,7 +532,7 @@ struct ChatView: View {
                 // Lock Icon Animation (Slides up)
                 if speechService.isRecording && !isRecordingCancelled {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout.weight(.semibold))
                         .foregroundStyle(.primary)
                         .offset(y: -50 + verticalDragOffset) // Moves with drag
                         .opacity(verticalDragOffset < -20 ? 1 : 0)
@@ -540,7 +541,7 @@ struct ChatView: View {
 
                 // Mic Icon
                 Image(systemName: isRecordingCancelled ? "trash.fill" : (isRecordingLocked ? "mic.fill" : "mic.fill"))
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(isRecordingCancelled ? .white : (speechService.isRecording ? subject.color : .secondary))
                     .symbolEffect(.bounce, value: speechService.isRecording)
                     .scaleEffect(speechService.isRecording ? 1.2 : 1.0)

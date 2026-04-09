@@ -161,7 +161,8 @@ struct AchievementUnlockView: View {
 
                     // Icon
                     Image(systemName: achievementType.icon)
-                        .font(.system(size: 44))
+                        .font(.largeTitle)
+                        .imageScale(.large)
                         .foregroundStyle(.white)
                         .symbolEffect(.bounce, value: iconBounce)
                 }

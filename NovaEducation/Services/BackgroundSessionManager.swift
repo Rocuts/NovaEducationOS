@@ -69,8 +69,11 @@ final class BackgroundSessionManager {
 
         guard !files.isEmpty else { return }
 
-        // Collect all image URL strings referenced by ChatMessages
-        let msgDescriptor = FetchDescriptor<ChatMessage>()
+        // Fetch only messages that have images (not ALL messages)
+        var msgDescriptor = FetchDescriptor<ChatMessage>(
+            predicate: #Predicate<ChatMessage> { $0.imageURLString != nil }
+        )
+        msgDescriptor.propertiesToFetch = [\.imageURLString]
         let messages = (try? context.fetch(msgDescriptor)) ?? []
         let referencedFilenames = Self.referencedImageFilenames(from: messages)
 

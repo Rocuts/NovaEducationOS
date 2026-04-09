@@ -382,7 +382,146 @@ Ref: [Donny Wals: Should you opt-in to Main Actor isolation?](https://www.donnyw
 - [ ] Auditar variables globales a nivel de archivo para SE-0412
 - [ ] Cambiar `SWIFT_VERSION` de `5.0` a `6.0`
 - [ ] Corregir errores resultantes
-- [ ] Migrar 28 font sizes hardcodeados a semánticos/@ScaledMetric
-- [ ] Optimizar SwiftData queries (HistoryView, SearchView, AchievementManager)
-- [ ] Expandir ContentSafetyService (NSDataDetector, CURP, jailbreak normalization)
+- [x] Migrar 39 font sizes hardcodeados a semánticos/@ScaledMetric (Phase 6)
+- [x] Optimizar SwiftData queries — HistoryView, SearchView, BackgroundSessionManager (Phase 6)
+- [x] Expandir ContentSafetyService — normalization, NSDataDetector, CURP, RFC, credit card, jailbreak (Phase 6)
+- [x] AchievementManager debounce (Phase 6)
+- [x] Swift 6 blockers — InterceptorMetrics thread safety, TextToSpeechService @preconcurrency (Phase 6)
 - [ ] Suite completa en Xcode 26+ y dispositivo físico con Apple Intelligence
+- [ ] ~15 fixed-size frames → @ScaledMetric (Phase 6 backlog)
+- [ ] SwiftData `NSFileProtectionComplete` en ModelConfiguration (Phase 6 backlog)
+- [ ] `tokenCount(for:)` API de iOS 26.4 para reemplazar `charCapacityThreshold` (Phase 6 backlog)
+
+---
+
+## Fase 6: Auditoría Integral y Backlog Cleanup (Abr 2026) - COMPLETADO
+
+### Metodología
+
+5 agentes paralelos (Research + 4 Audit: UX, Architecture, Privacy, Accessibility) ejecutados con Opus. 22 hallazgos clasificados por severidad. Todas las correcciones implementadas en orden de prioridad.
+
+### Auditoría de Privacidad — PASS (re-verificado)
+
+- **CERO conexiones de red** en código de producción (re-confirmado)
+- Única dependencia externa: SwiftMath (v1.7.3) — renderizado LaTeX local, sin networking
+- Todos los logs con contenido dinámico usan `privacy: .private`
+- Foundation Models: sanitización de entrada correcta, separación system prompt/user data
+
+### Correcciones Aplicadas
+
+#### HIGH — Seguridad
+
+1. **ContentSafetyService — Pipeline de normalización anti-bypass**
+   - **Stripping de caracteres invisibles**: elimina zero-width chars (U+200B, U+200C, U+200D, U+FEFF, U+00AD y 12 más de categoría Cf). Investigación (Mindgard 2025) demostró 76.2% éxito de ataque con inserción de estos caracteres.
+   - **Normalización NFKC**: colapsa homoglyphs (ﬁ → fi, ① → 1) usando `precomposedStringWithCompatibilityMapping`
+   - **Normalización leetspeak**: mapea 0→o, 1→i, 3→e, 4→a, 5→s, 7→t, @→a, $→s
+   - **Strip separadores entre chars aislados**: "i.g.n.o.r.a" → "ignora"
+   - Normalización aplicada ANTES de detección de jailbreak/harmful content, NO en detección de PII
+
+2. **ContentSafetyService — PII expandido**
+   - **NSDataDetector** reemplaza phone regex custom: detecta teléfonos internacionales (+52 México) + direcciones físicas automáticamente
+   - **CURP** (ID nacional México, 18 chars): regex validado con formato estado/género/consonantes
+   - **RFC** (ID fiscal México, 12-13 chars): regex con Ñ y & support
+   - **Tarjetas de crédito**: regex 13-16 dígitos + validación **Luhn checksum** para eliminar falsos positivos
+
+3. **ContentSafetyService — Jailbreak patterns expandidos**
+   - 12 → 29 patrones de detección
+   - Nuevos patrones español: "finge que eres", "pretende que eres", "actúa como si fueras", "el profesor dijo que ignores", "las nuevas instrucciones son", "modo sin restricciones", "responde sin filtros"
+   - Nuevos patrones inglés: "pretend you are", "you are now", "act as if you were", "do anything now"
+   - Normalización pre-matching derrota: zero-width bypass, leetspeak, separator obfuscation
+
+#### HIGH — Swift 6 Blockers
+
+4. **InterceptorMetrics — Thread safety para Swift 6**
+   - Contadores (`totalRequests`, `totalIntercepted`, etc.) refactorizados de `private(set) static var` a `private static var _X` con computed properties que acceden via `lock.withLock`
+   - Todas las lecturas ahora pasan por el lock, consistente con el patrón de `RenderMetrics`
+   - Elimina errores de concurrencia bajo SE-0412 al cambiar a Swift 6
+
+5. **TextToSpeechService — @preconcurrency delegate**
+   - Agregado `@preconcurrency` en conformance `AVSpeechSynthesizerDelegate`
+   - Con SWIFT_VERSION=5.0 es advisory; se convierte en requerido con Swift 6
+   - Patrón `nonisolated` + `Task { @MainActor in }` en métodos delegate ya es correcto
+
+#### HIGH — SwiftData Query Optimization
+
+6. **HistoryView — De @Query ALL a 12 targeted fetches**
+   - Eliminado: `@Query(sort: \ChatMessage.timestamp, order: .reverse)` que cargaba TODOS los mensajes
+   - Reemplazado con: `FetchDescriptor` por materia con `fetchLimit: 1` + `fetchCount` por separado
+   - 12 Subject × (1 fetch + 1 count) = 24 queries lightweight vs 1 query masiva
+   - Datos se refrescan en `onAppear` (suficiente para lista de historial)
+
+7. **SearchView — Dynamic @Query Subview Pattern**
+   - Eliminado: `@Query` + `filteredMessages` computed property que filtraba ALL en memoria
+   - Nuevo: `SearchMessageResults` child view con `@Query` dinámico en `init`
+   - Usa `localizedStandardContains` (maneja diacríticos: "calculo" matchea "cálculo") en vez de `localizedCaseInsensitiveContains`
+   - La base de datos filtra, no Swift en memoria
+   - Ref: WWDC23-10196 — Subview Initializer pattern
+
+8. **BackgroundSessionManager — Filtered image query**
+   - Agregado predicate `imageURLString != nil` y `propertiesToFetch = [\.imageURLString]`
+   - Solo fetchea mensajes con imágenes, no TODOS los mensajes
+
+#### MEDIUM — Performance
+
+9. **AchievementManager — Debounce de 7+ queries**
+   - `checkAchievements` ahora ejecuta la verificación completa cada 5 llamadas (no cada mensaje)
+   - Parámetro `force: true` para bypass en eventos importantes (quest completion, app launch)
+   - Reduce ~80% de queries en sesiones de chat activas
+
+#### MEDIUM — Dynamic Type (39 font sizes migrados)
+
+10. **DesignTokens.Typography — 11 tokens migrados a semántico**
+    - `displayLarge`: `.largeTitle.bold()` (antes: `.system(size: 34)`)
+    - `displayMedium`: `.title.bold()` (antes: `.system(size: 28)`)
+    - `displaySmall`: `.title2.bold()` (antes: `.system(size: 24)`)
+    - `headlineLarge`: `.title2.bold()` (antes: `.system(size: 22)`)
+    - `headlineSmall`: `.subheadline.weight(.semibold)` (antes: `.system(size: 15)`)
+    - `labelLarge/Medium/Small`: `.subheadline/.footnote/.caption2` (antes: `.system(size: 15/13/11)`)
+    - `numericLarge/Medium/Small`: `.largeTitle/.title2/.footnote` (antes: `.system(size: 48/24/13)`)
+    - `.fontDesign(.rounded)` se aplica en call sites para display/numeric tokens
+
+11. **28 inline font sizes migrados** (across 14 archivos)
+    - Patrón A (≤22pt): Reemplazo semántico directo → `.callout`, `.body`, `.title3`, `.title2`
+    - Patrón B (con rounded): Semántico + `.fontDesign(.rounded)`
+    - Patrón C (>34pt en texto): `@ScaledMetric(relativeTo: .largeTitle)` → 4 instancias
+    - Patrón D (>34pt en SF Symbols): `.font(.largeTitle).imageScale(.large)` → 6 instancias
+    - **CERO** `.font(.system(size: N))` hardcodeados en el codebase
+
+#### MEDIUM — Accesibilidad
+
+12. **ThinkingIndicator** — `.accessibilityLabel("Nova está procesando")` + `.accessibilityAddTraits(.updatesFrequently)`
+13. **ThinkingBubble** — `.accessibilityElement(children: .combine)` + label dinámico
+14. **ParticleExplosionView** — `.accessibilityHidden(true)` (decorativo)
+15. **Empty states** — `.accessibilityElement(children: .combine)` en HistoryView y SearchView
+
+#### MEDIUM — i18n
+
+16. **"XP Bonus" → "Bonificación XP"** en NovaToastSystem.swift (FocusSummaryCard)
+17. **"Preguntame" → "Pregúntame"** y **"ayudare" → "ayudaré"** en ChatView welcome message
+18. **"Error" → "Algo salió mal"** en ChatView alert title
+
+#### LOW
+
+19. **MainTabView** — fallback de color scheme cambiado de `.light` a `nil` (respeta configuración del sistema cuando settings es nil en primer launch)
+
+### Backlog Residual (Phase 7)
+
+| Item | Severidad | Notas |
+|------|-----------|-------|
+| ~15 fixed-size frames (`.frame(width: 50)`) | MEDIUM | Migrar a `@ScaledMetric` para Dynamic Type |
+| SwiftData `NSFileProtectionComplete` | LOW | `ModelConfiguration` no expone `fileProtection`; default es Class C |
+| iOS 26.4 `tokenCount(for:)` API | LOW | Reemplaza `charCapacityThreshold` heurística con conteo exacto |
+| `SWIFT_VERSION` flip a 6.0 | MEDIUM | Bloqueadores resueltos; contar warnings antes de flip |
+| Consolidar `normalize()` duplicado | LOW | Router/Catalog/Interceptors tienen funciones similares |
+| Consolidar `fetchSettings()` duplicado | LOW | XPManager/AchievementManager/otros tienen el mismo pattern |
+| ChatView refactor (787 líneas) | LOW | Extraer inputArea, micButton, gesture handling |
+| OracleOrbView `accessibilityHidden` | LOW | No se usa fuera de su Preview; agregar cuando se integre |
+| HomeView quests button accessibility | LOW | Agregar `.accessibilityLabel` al botón de quests en statsRow |
+
+### Research: iOS 26.4 Foundation Models Updates
+
+iOS 26.4 agrega dos APIs `@backDeployed` a todo iOS 26.x:
+- `SystemLanguageModel.contextSize` — retorna capacidad de tokens disponible
+- `LanguageModelSession.tokenCount(for:)` — mide consumo de tokens de un input dado
+- Ambas eliminan la necesidad de la heurística `charCapacityThreshold = 11,000 chars`
+- Ref: [TN3193](https://developer.apple.com/documentation/technotes/tn3193-managing-the-on-device-foundation-model-s-context-window)

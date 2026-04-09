@@ -47,15 +47,23 @@ enum InterceptorMetrics {
     private static var buffer: [Entry] = []
     private static let maxEntries = 100
 
-    // MARK: - Counters
+    // MARK: - Counters (all access through lock)
 
-    private(set) static var totalRequests: Int = 0
-    private(set) static var totalIntercepted: Int = 0
-    private(set) static var totalPassthrough: Int = 0
-    private(set) static var catalogHits: Int = 0
-    private(set) static var computedResults: Int = 0
-    private(set) static var grammarResults: Int = 0
-    private(set) static var factLookups: Int = 0
+    private static var _totalRequests: Int = 0
+    private static var _totalIntercepted: Int = 0
+    private static var _totalPassthrough: Int = 0
+    private static var _catalogHits: Int = 0
+    private static var _computedResults: Int = 0
+    private static var _grammarResults: Int = 0
+    private static var _factLookups: Int = 0
+
+    static var totalRequests: Int { lock.withLock { _totalRequests } }
+    static var totalIntercepted: Int { lock.withLock { _totalIntercepted } }
+    static var totalPassthrough: Int { lock.withLock { _totalPassthrough } }
+    static var catalogHits: Int { lock.withLock { _catalogHits } }
+    static var computedResults: Int { lock.withLock { _computedResults } }
+    static var grammarResults: Int { lock.withLock { _grammarResults } }
+    static var factLookups: Int { lock.withLock { _factLookups } }
 
     // MARK: - Logger
 
@@ -91,23 +99,23 @@ enum InterceptorMetrics {
             buffer.removeFirst(buffer.count - maxEntries)
         }
 
-        totalRequests += 1
+        _totalRequests += 1
 
         switch result.category {
         case .catalogHit:
-            totalIntercepted += 1
-            catalogHits += 1
+            _totalIntercepted += 1
+            _catalogHits += 1
         case .computed:
-            totalIntercepted += 1
-            computedResults += 1
+            _totalIntercepted += 1
+            _computedResults += 1
         case .grammarRule:
-            totalIntercepted += 1
-            grammarResults += 1
+            _totalIntercepted += 1
+            _grammarResults += 1
         case .factLookup:
-            totalIntercepted += 1
-            factLookups += 1
+            _totalIntercepted += 1
+            _factLookups += 1
         case .passthrough:
-            totalPassthrough += 1
+            _totalPassthrough += 1
         }
 
         logger.info(
@@ -124,22 +132,22 @@ enum InterceptorMetrics {
     /// Percentage of requests successfully intercepted (not passthrough)
     static var interceptRate: Double {
         lock.withLock {
-            guard totalRequests > 0 else { return 0 }
-            return Double(totalIntercepted) / Double(totalRequests) * 100
+            guard _totalRequests > 0 else { return 0 }
+            return Double(_totalIntercepted) / Double(_totalRequests) * 100
         }
     }
 
     static var summary: String {
         lock.withLock {
-            let rate = totalRequests > 0
-                ? Double(totalIntercepted) / Double(totalRequests) * 100
+            let rate = _totalRequests > 0
+                ? Double(_totalIntercepted) / Double(_totalRequests) * 100
                 : 0.0
             return """
-            InterceptorMetrics: \(totalRequests) requests, \
-            \(totalIntercepted) intercepted (\(String(format: "%.1f", rate))%), \
-            \(totalPassthrough) passthrough | \
-            catalog=\(catalogHits) computed=\(computedResults) \
-            grammar=\(grammarResults) fact=\(factLookups)
+            InterceptorMetrics: \(_totalRequests) requests, \
+            \(_totalIntercepted) intercepted (\(String(format: "%.1f", rate))%), \
+            \(_totalPassthrough) passthrough | \
+            catalog=\(_catalogHits) computed=\(_computedResults) \
+            grammar=\(_grammarResults) fact=\(_factLookups)
             """
         }
     }
@@ -148,12 +156,12 @@ enum InterceptorMetrics {
         lock.lock()
         defer { lock.unlock() }
         buffer.removeAll()
-        totalRequests = 0
-        totalIntercepted = 0
-        totalPassthrough = 0
-        catalogHits = 0
-        computedResults = 0
-        grammarResults = 0
-        factLookups = 0
+        _totalRequests = 0
+        _totalIntercepted = 0
+        _totalPassthrough = 0
+        _catalogHits = 0
+        _computedResults = 0
+        _grammarResults = 0
+        _factLookups = 0
     }
 }

@@ -4,8 +4,6 @@ import SwiftData
 struct SearchView: View {
     @Binding var selectedSubject: Subject?
     let settings: UserSettings
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \ChatMessage.timestamp, order: .reverse) private var allMessages: [ChatMessage]
     @State private var searchText = ""
     @State private var resultsAppeared = false
 
@@ -19,57 +17,32 @@ struct SearchView: View {
         }
     }
 
-    private var filteredMessages: [ChatMessage] {
-        guard !searchText.isEmpty, searchText.count >= 2 else { return [] }
-        return allMessages.filter { message in
-            message.content.localizedCaseInsensitiveContains(searchText)
-        }
-    }
-
-    private var hasResults: Bool {
-        !filteredSubjects.isEmpty || !filteredMessages.isEmpty
-    }
-
     var body: some View {
         ZStack {
             backgroundGradient
 
-            if !searchText.isEmpty && !hasResults {
-                VStack(spacing: Nova.Spacing.xl) {
-                    Image(systemName: "text.magnifyingglass")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.secondary)
+            ScrollView {
+                LazyVStack(spacing: Nova.Spacing.lg) {
+                    if searchText.isEmpty {
+                        subjectResultsSection(title: "Todas las materias", subjects: filteredSubjects)
+                    } else {
+                        if !filteredSubjects.isEmpty {
+                            subjectResultsSection(title: "Materias", subjects: filteredSubjects)
+                        }
 
-                    VStack(spacing: Nova.Spacing.sm) {
-                        Text("Sin resultados para \"\(searchText)\"")
-                            .font(.title3.bold())
-
-                        Text("Prueba con otras palabras o revisa la ortografía")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .padding(.horizontal, Nova.Spacing.jumbo)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: Nova.Spacing.lg) {
-                        if searchText.isEmpty {
-                            subjectResultsSection(title: "Todas las materias", subjects: filteredSubjects)
-                        } else {
-                            if !filteredSubjects.isEmpty {
-                                subjectResultsSection(title: "Materias", subjects: filteredSubjects)
-                            }
-                            if !filteredMessages.isEmpty {
-                                chatResultsSection
-                            }
+                        // Child view with dynamic @Query — database filters, not Swift in memory
+                        SearchMessageResults(
+                            searchText: searchText,
+                            hasSubjectResults: !filteredSubjects.isEmpty
+                        ) { subject in
+                            selectedSubject = subject
                         }
                     }
-                    .padding()
-                    .onAppear { resultsAppeared = true }
                 }
-                .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
+                .padding()
+                .onAppear { resultsAppeared = true }
             }
+            .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
         }
         .navigationTitle("Buscar")
         .searchable(text: $searchText, prompt: "Buscar materia o en tus conversaciones...")
@@ -98,7 +71,53 @@ struct SearchView: View {
         }
     }
 
-    // MARK: - Chat Results Section
+    // MARK: - Background
+    private var backgroundGradient: some View {
+        Color(uiColor: .systemGroupedBackground)
+            .ignoresSafeArea()
+    }
+}
+
+// MARK: - Search Message Results (dynamic @Query subview pattern)
+// Ref: WWDC23-10196 — @Query cannot change its predicate at runtime,
+// so we move it to a child view whose init accepts parameters.
+
+struct SearchMessageResults: View {
+    @Query private var messages: [ChatMessage]
+    let searchText: String
+    let hasSubjectResults: Bool
+    let onSelectSubject: (Subject) -> Void
+
+    init(searchText: String, hasSubjectResults: Bool, onSelectSubject: @escaping (Subject) -> Void) {
+        self.searchText = searchText
+        self.hasSubjectResults = hasSubjectResults
+        self.onSelectSubject = onSelectSubject
+
+        // localizedStandardContains handles diacritics: "calculo" matches "cálculo"
+        if searchText.count >= 2 {
+            let text = searchText
+            _messages = Query(
+                filter: #Predicate<ChatMessage> { $0.content.localizedStandardContains(text) },
+                sort: \.timestamp,
+                order: .reverse
+            )
+        } else {
+            _messages = Query(
+                filter: #Predicate<ChatMessage> { _ in false },
+                sort: \.timestamp,
+                order: .reverse
+            )
+        }
+    }
+
+    var body: some View {
+        if !messages.isEmpty {
+            chatResultsSection
+        } else if !hasSubjectResults {
+            noResultsView
+        }
+    }
+
     private var chatResultsSection: some View {
         VStack(alignment: .leading, spacing: Nova.Spacing.md) {
             HStack {
@@ -108,26 +127,43 @@ struct SearchView: View {
 
                 Spacer()
 
-                Text("\(filteredMessages.count) resultado\(filteredMessages.count == 1 ? "" : "s")")
+                Text("\(messages.count) resultado\(messages.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, Nova.Spacing.xxs)
 
-            ForEach(filteredMessages) { message in
+            ForEach(messages) { message in
                 ChatResultRow(message: message, searchText: searchText) {
                     if let subject = Subject(rawValue: message.subjectId) {
-                        selectedSubject = subject
+                        onSelectSubject(subject)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Background
-    private var backgroundGradient: some View {
-        Color(uiColor: .systemGroupedBackground)
-            .ignoresSafeArea()
+    private var noResultsView: some View {
+        VStack(spacing: Nova.Spacing.xl) {
+            Image(systemName: "text.magnifyingglass")
+                .font(.largeTitle)
+                .imageScale(.large)
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: Nova.Spacing.sm) {
+                Text("Sin resultados para \"\(searchText)\"")
+                    .font(.title3.bold())
+
+                Text("Prueba con otras palabras o revisa la ortografía")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, Nova.Spacing.jumbo)
+        .frame(maxWidth: .infinity)
+        .padding(.top, Nova.Spacing.jumbo)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -194,7 +230,6 @@ struct ChatResultRow: View {
         var addPrefixEllipsis = false
         var addSuffixEllipsis = false
 
-        // Limitar a 150 caracteres alrededor del texto encontrado
         if let range = originalContent.range(of: searchText, options: [.caseInsensitive, .diacriticInsensitive]) {
             let startIndex = originalContent.index(range.lowerBound, offsetBy: -50, limitedBy: originalContent.startIndex) ?? originalContent.startIndex
             let endIndex = originalContent.index(range.upperBound, offsetBy: 100, limitedBy: originalContent.endIndex) ?? originalContent.endIndex
@@ -213,7 +248,6 @@ struct ChatResultRow: View {
 
         var attributed = AttributedString(content)
 
-        // Resaltar el texto buscado
         if let range = attributed.range(of: searchText, options: .caseInsensitive) {
             attributed[range].backgroundColor = .yellow.opacity(0.4)
             attributed[range].inlinePresentationIntent = .stronglyEmphasized
@@ -232,7 +266,6 @@ struct ChatResultRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: Nova.Spacing.md) {
-                // Icon de la materia
                 ZStack {
                     Circle()
                         .fill((subject?.color ?? .gray).opacity(0.15))
@@ -243,7 +276,6 @@ struct ChatResultRow: View {
                         .foregroundStyle(subject?.color ?? .gray)
                 }
 
-                // Contenido
                 VStack(alignment: .leading, spacing: Nova.Spacing.xs) {
                     HStack {
                         Text(subject?.displayName ?? "Chat")
@@ -265,7 +297,6 @@ struct ChatResultRow: View {
                         .multilineTextAlignment(.leading)
                 }
 
-                // Arrow
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(.tertiary)

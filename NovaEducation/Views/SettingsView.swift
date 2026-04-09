@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Bindable var settings: UserSettings
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = SettingsViewModel()
+    @ScaledMetric(relativeTo: .largeTitle) private var avatarInitialSize: CGFloat = 42
 
     var body: some View {
         ScrollView {
@@ -98,7 +99,7 @@ struct SettingsView: View {
                     .frame(width: 100, height: 100)
 
                 Text(settings.studentName.prefix(1).uppercased())
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .font(.system(size: avatarInitialSize, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
             }
             .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
@@ -429,7 +430,7 @@ struct SettingsRow<Accessory: View>: View {
                     .frame(width: 32, height: 32)
 
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(.white)
             }
 
@@ -461,7 +462,7 @@ struct SettingsToggleRow: View {
                     .frame(width: 32, height: 32)
 
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(.white)
             }
 

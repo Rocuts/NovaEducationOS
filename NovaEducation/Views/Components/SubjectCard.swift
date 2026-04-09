@@ -12,7 +12,7 @@ struct SubjectCard: View {
                     .frame(width: 50, height: 50)
 
                 Image(systemName: subject.icon)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(.white)
             }
 
@@ -47,7 +47,7 @@ struct SubjectCardCompact: View {
                     .frame(width: 40, height: 40)
 
                 Image(systemName: subject.icon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(.white)
             }
 

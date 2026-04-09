@@ -65,7 +65,7 @@ struct OracleOrbView: UIViewRepresentable {
         
         return scnView
     }
-    
+
     func updateUIView(_ uiView: SCNView, context: Context) {
         guard let orbNode = uiView.scene?.rootNode.childNode(withName: "orb", recursively: false) else { return }
         

@@ -16,12 +16,21 @@ final class AchievementManager {
     /// Si hay un logro recién desbloqueado para mostrar
     var hasNewUnlock: Bool = false
 
+    /// Debounce: only check achievements every N messages to reduce query load
+    private var messagesSinceLastCheck: Int = 0
+    private static let checkInterval = 5
+
     private init() {}
 
     // MARK: - Achievement Checking
 
-    /// Verifica todos los logros y desbloquea los que correspondan
-    func checkAchievements(context: ModelContext) {
+    /// Verifica todos los logros y desbloquea los que correspondan.
+    /// Debounced: only runs the full check every 5 calls to reduce 7+ queries per message.
+    /// Pass force: true to bypass debounce (e.g., on app launch or quest completion).
+    func checkAchievements(context: ModelContext, force: Bool = false) {
+        messagesSinceLastCheck += 1
+        guard force || messagesSinceLastCheck >= Self.checkInterval else { return }
+        messagesSinceLastCheck = 0
         // Obtener settings y datos necesarios
         guard let settings = fetchSettings(context: context) else { return }
 

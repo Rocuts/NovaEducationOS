@@ -142,7 +142,8 @@ struct QuestProgressRing: View {
                 .rotationEffect(.degrees(-90))
 
             Text("\(completed)")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(.caption2.bold())
+                .fontDesign(.rounded)
                 .foregroundStyle(.primary)
         }
         .accessibilityElement(children: .ignore)

@@ -54,7 +54,7 @@ struct VoiceModeView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.body.bold())
                             .foregroundStyle(closeButtonForeground)
                             .frame(width: 44, height: 44)
                             .background(

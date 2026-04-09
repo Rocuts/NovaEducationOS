@@ -446,7 +446,7 @@ struct NovaToastView: View {
                 .frame(width: 40, height: 40)
 
             Image(systemName: toast.icon)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(toast.iconColor)
                 .symbolEffect(.bounce, value: iconBounce)
         }
@@ -664,7 +664,7 @@ struct FocusPhaseIndicator: View {
                     .scaleEffect(pulsing ? 1.3 : 0.9)
 
                 Image(systemName: phase.icon)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.caption.bold())
                     .foregroundStyle(phase.color)
             }
 
@@ -762,7 +762,8 @@ struct FocusSummaryCard: View {
                         .foregroundStyle(maxPhase.color)
 
                     Text("\(totalMinutes)")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.title2.bold())
+                        .fontDesign(.rounded)
 
                     Text("min")
                         .font(.caption2)
@@ -796,7 +797,7 @@ struct FocusSummaryCard: View {
                     statItem(
                         icon: "sparkles",
                         value: "+\(maxPhase.xpBonus)",
-                        label: "XP Bonus",
+                        label: "Bonificación XP",
                         color: .yellow
                     )
                 }

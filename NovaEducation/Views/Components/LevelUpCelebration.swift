@@ -9,6 +9,7 @@ struct LevelUpCelebration: View {
     let newTitle: String
     let onDismiss: () -> Void
 
+    @ScaledMetric(relativeTo: .largeTitle) private var levelSize: CGFloat = 56
     @State private var showOverlay = false
     @State private var showBadge = false
     @State private var showText = false
@@ -132,7 +133,7 @@ struct LevelUpCelebration: View {
 
                     // Level number
                     Text("\(displayedLevel)")
-                        .font(.system(size: 56, weight: .bold, design: .rounded))
+                        .font(.system(size: levelSize, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .contentTransition(.numericText(value: Double(displayedLevel)))
                 }

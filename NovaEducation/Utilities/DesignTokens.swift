@@ -57,15 +57,15 @@ enum Nova {
     // Default design for Body preserves readability in educational content.
     enum Typography {
 
-        // Display - for hero numbers and celebrations
-        static let displayLarge = Font.system(size: 34, weight: .bold, design: .rounded)
-        static let displayMedium = Font.system(size: 28, weight: .bold, design: .rounded)
-        static let displaySmall = Font.system(size: 24, weight: .bold, design: .rounded)
+        // Display - for hero numbers and celebrations (semantic + rounded design)
+        static let displayLarge = Font.largeTitle.bold().width(.standard)
+        static let displayMedium = Font.title.bold()
+        static let displaySmall = Font.title2.bold()
 
         // Headlines - section titles, card headers
-        static let headlineLarge = Font.system(size: 22, weight: .bold)
+        static let headlineLarge = Font.title2.bold()
         static let headlineMedium = Font.headline
-        static let headlineSmall = Font.system(size: 15, weight: .semibold)
+        static let headlineSmall = Font.subheadline.weight(.semibold)
 
         // Body - educational content, chat messages
         static let bodyLarge = Font.body
@@ -73,18 +73,19 @@ enum Nova {
         static let bodySmall = Font.footnote
 
         // Labels - buttons, badges, tags
-        static let labelLarge = Font.system(size: 15, weight: .semibold)
-        static let labelMedium = Font.system(size: 13, weight: .semibold)
-        static let labelSmall = Font.system(size: 11, weight: .semibold)
+        static let labelLarge = Font.subheadline.weight(.semibold)
+        static let labelMedium = Font.footnote.weight(.semibold)
+        static let labelSmall = Font.caption2.weight(.semibold)
 
         // Captions - timestamps, metadata
         static let captionLarge = Font.caption
         static let captionSmall = Font.caption2
 
         // Numeric - XP counters, levels, stats (rounded for playful + premium)
-        static let numericLarge = Font.system(size: 48, weight: .bold, design: .rounded)
-        static let numericMedium = Font.system(size: 24, weight: .bold, design: .rounded)
-        static let numericSmall = Font.system(size: 13, weight: .bold, design: .rounded)
+        // Note: sizes >34pt use @ScaledMetric at call sites for Dynamic Type scaling
+        static let numericLarge = Font.largeTitle.bold()
+        static let numericMedium = Font.title2.bold()
+        static let numericSmall = Font.footnote.bold()
     }
 
     // MARK: - Semantic Colors

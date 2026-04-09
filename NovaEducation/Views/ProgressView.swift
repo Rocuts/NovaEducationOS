@@ -83,7 +83,8 @@ struct StudentProgressView: View {
             if !hasActivity {
                 VStack(spacing: Nova.Spacing.xl) {
                     Image(systemName: "graduationcap")
-                        .font(.system(size: 56))
+                        .font(.largeTitle)
+                        .imageScale(.large)
                         .foregroundStyle(.blue.opacity(0.6))
                         .symbolEffect(.pulse, options: .repeating.speed(0.5))
 

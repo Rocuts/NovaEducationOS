@@ -97,7 +97,7 @@ struct HomeView: View {
                     focusManager.toggleFocusMode()
                 } label: {
                     Image(systemName: focusManager.isFocusModeActive ? "moon.stars.fill" : "moon.stars")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(focusManager.isFocusModeActive ? .white : .indigo)
                         .frame(width: 36, height: 36)
                         .background(
@@ -292,7 +292,7 @@ struct QuickActionChip: View {
         Button(action: action) {
             HStack(spacing: Nova.Spacing.sm) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(color)
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -483,7 +483,8 @@ struct GoalEditView: View {
                     }
                 } label: {
                     Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 44))
+                        .font(.largeTitle)
+                        .imageScale(.large)
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityLabel("Reducir meta")
@@ -496,7 +497,8 @@ struct GoalEditView: View {
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 44))
+                        .font(.largeTitle)
+                        .imageScale(.large)
                         .foregroundStyle(.blue)
                 }
                 .accessibilityLabel("Aumentar meta")

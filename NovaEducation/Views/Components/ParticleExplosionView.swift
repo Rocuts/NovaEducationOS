@@ -40,6 +40,7 @@ struct ParticleExplosionView: View {
                         }
                     }
                     .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                 }
             }
         }

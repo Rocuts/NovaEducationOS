@@ -30,6 +30,8 @@ struct ThinkingIndicator: View {
                 Nova.Animation.dotBounce
             }
         }
+        .accessibilityLabel("Nova está procesando")
+        .accessibilityAddTraits(.updatesFrequently)
     }
 
     private func dotOpacity(for index: Int, in phase: Phase) -> Double {
@@ -86,6 +88,8 @@ struct ThinkingBubble: View {
             .background(Color(uiColor: .secondarySystemBackground))
             .clipShape(BubbleShape(isUser: false))
             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(message)")
 
             Spacer(minLength: 60)
         }

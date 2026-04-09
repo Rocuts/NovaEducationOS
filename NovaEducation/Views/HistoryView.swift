@@ -4,34 +4,19 @@ import SwiftData
 struct HistoryView: View {
     @Binding var selectedSubject: Subject?
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \ChatMessage.timestamp, order: .reverse) private var allMessages: [ChatMessage]
 
-    // Group messages by subject and get the most recent for each
-    private var recentConversations: [(subject: Subject, lastMessage: ChatMessage, messageCount: Int)] {
-        var subjectMessages: [String: [ChatMessage]] = [:]
-
-        for message in allMessages {
-            subjectMessages[message.subjectId, default: []].append(message)
-        }
-
-        return subjectMessages.compactMap { (subjectId, messages) in
-            guard let subject = Subject(rawValue: subjectId),
-                  let lastMessage = messages.first else { return nil }
-            return (subject: subject, lastMessage: lastMessage, messageCount: messages.count)
-        }
-        .sorted { $0.lastMessage.timestamp > $1.lastMessage.timestamp }
-    }
-
+    @State private var conversations: [(subject: Subject, lastMessage: ChatMessage, messageCount: Int)] = []
     @State private var rowsAppeared = false
 
     var body: some View {
         ZStack {
             backgroundGradient
 
-            if recentConversations.isEmpty {
+            if conversations.isEmpty {
                 VStack(spacing: Nova.Spacing.xl) {
                     Image(systemName: "bubble.left.and.text.bubble.right")
-                        .font(.system(size: 56))
+                        .font(.largeTitle)
+                        .imageScale(.large)
                         .foregroundStyle(.blue.opacity(0.6))
                         .symbolEffect(.pulse, options: .repeating.speed(0.5))
 
@@ -46,10 +31,11 @@ struct HistoryView: View {
                     }
                 }
                 .padding(.horizontal, Nova.Spacing.jumbo)
+                .accessibilityElement(children: .combine)
             } else {
                 ScrollView {
                     LazyVStack(spacing: Nova.Spacing.md) {
-                        ForEach(Array(recentConversations.enumerated()), id: \.element.subject.id) { index, conversation in
+                        ForEach(Array(conversations.enumerated()), id: \.element.subject.id) { index, conversation in
                             ConversationRow(
                                 subject: conversation.subject,
                                 lastMessage: conversation.lastMessage,
@@ -63,7 +49,6 @@ struct HistoryView: View {
                         }
                     }
                     .padding()
-                    .onAppear { rowsAppeared = true }
                 }
                 .contentMargins(.bottom, Nova.Spacing.tabBarClearance, for: .scrollContent)
             }
@@ -71,6 +56,34 @@ struct HistoryView: View {
         .navigationTitle("Historial")
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+        .onAppear {
+            loadConversations()
+            rowsAppeared = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                rowsAppeared = true
+            }
+        }
+    }
+
+    // MARK: - Data Loading (12 targeted queries instead of loading ALL messages)
+
+    private func loadConversations() {
+        conversations = Subject.allCases.compactMap { subject in
+            let subjectId = subject.rawValue
+            var descriptor = FetchDescriptor<ChatMessage>(
+                predicate: #Predicate<ChatMessage> { $0.subjectId == subjectId },
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            descriptor.fetchLimit = 1
+            guard let lastMsg = try? modelContext.fetch(descriptor).first else { return nil }
+
+            let countDescriptor = FetchDescriptor<ChatMessage>(
+                predicate: #Predicate<ChatMessage> { $0.subjectId == subjectId }
+            )
+            let count = (try? modelContext.fetchCount(countDescriptor)) ?? 0
+            return (subject: subject, lastMessage: lastMsg, messageCount: count)
+        }
+        .sorted { $0.lastMessage.timestamp > $1.lastMessage.timestamp }
     }
 
     // MARK: - Background

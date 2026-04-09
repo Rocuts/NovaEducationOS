@@ -28,7 +28,8 @@ struct XPProgressBar: View {
                             .shadow(color: .blue.opacity(0.3), radius: 8)
 
                         Text("\(currentLevel)")
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .font(.title3.bold())
+                            .fontDesign(.rounded)
                             .foregroundStyle(.white)
                     }
 
@@ -214,7 +215,7 @@ struct XPGainToast: View {
                         .frame(width: 40, height: 40)
 
                     Image(systemName: "sparkles")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(.yellow)
                         .symbolEffect(.bounce, value: iconBounce)
                 }
@@ -551,7 +552,8 @@ struct CompactXPDisplay: View {
                     .frame(width: 26, height: 26)
 
                 Text("\(currentLevel)")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(.footnote.bold())
+                    .fontDesign(.rounded)
                     .foregroundStyle(.white)
             }
 

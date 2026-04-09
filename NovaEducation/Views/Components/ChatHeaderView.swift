@@ -17,7 +17,7 @@ struct ChatHeaderView: View {
                 // Back Button
                 Button(action: onBack) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 44, height: 44)
                         .glassEffect(.regular, in: .circle)
@@ -57,7 +57,7 @@ struct ChatHeaderView: View {
                 // Delete Button
                 Button(action: onDelete) {
                     Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.callout.weight(.medium))
                         .foregroundStyle(.red.opacity(0.8))
                         .frame(width: 44, height: 44)
                         .glassEffect(.regular, in: .circle)
