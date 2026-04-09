@@ -1,0 +1,99 @@
+NovaEducation Source-Available License
+Version 1.0, April 2026
+
+Copyright (c) 2026 Johan Rocuts. All Rights Reserved.
+
+TERMS AND CONDITIONS
+
+1. DEFINITIONS
+
+   "Software" means the NovaEducation source code, documentation, assets,
+   and any associated files contained in this repository.
+
+   "You" means any individual or entity that accesses, views, or interacts
+   with the Software.
+
+   "Author" means Johan Rocuts, the original creator and copyright holder
+   of the Software.
+
+2. SOURCE VIEWING PERMISSION
+
+   Subject to the terms of this License, the Author grants You a limited,
+   non-exclusive, non-transferable, revocable permission to view and read
+   the source code of the Software solely for personal educational review
+   and evaluation purposes.
+
+3. RESTRICTIONS
+
+   You may NOT, without prior explicit written permission from the Author:
+
+   a) Use the Software, in whole or in part, for any purpose — including
+      but not limited to personal, educational, commercial, or
+      non-commercial use;
+
+   b) Copy, reproduce, or duplicate the Software or any portion thereof;
+
+   c) Modify, adapt, translate, or create derivative works based on the
+      Software or any portion thereof;
+
+   d) Distribute, publish, sublicense, sell, lease, rent, or otherwise
+      transfer the Software or any portion thereof to any third party;
+
+   e) Incorporate any portion of the Software into another project,
+      product, or service;
+
+   f) Use the Software to train, fine-tune, or otherwise develop machine
+      learning models, artificial intelligence systems, or automated
+      code generation tools;
+
+   g) Remove, alter, or obscure any copyright notices, license terms,
+      or attribution contained in the Software;
+
+   h) Reverse engineer the architectural patterns, algorithms, or
+      safety mechanisms implemented in the Software for the purpose
+      of replication in a competing product.
+
+4. INTELLECTUAL PROPERTY
+
+   The Software is and remains the exclusive intellectual property of the
+   Author. No ownership, intellectual property rights, or implied licenses
+   are transferred to You by this License. All rights not explicitly
+   granted herein are reserved by the Author.
+
+5. GITHUB TERMS OF SERVICE
+
+   This License acknowledges that GitHub's Terms of Service permit users
+   to view and fork public repositories. Such viewing and forking rights
+   do NOT constitute permission to use, modify, distribute, or create
+   derivative works from the Software beyond what is explicitly stated
+   in Section 2 of this License.
+
+6. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+   CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
+   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. TERMINATION
+
+   This License and all permissions granted herein terminate automatically
+   if You violate any of its terms. Upon termination, You must
+   immediately cease all use of the Software and destroy any copies in
+   Your possession.
+
+8. CONTACT
+
+   For licensing inquiries, commercial use requests, or permissions
+   beyond the scope of this License, contact the Author directly via
+   the repository's contact information.
+
+---
+
+This is NOT an open-source license. This Software is proprietary and
+source-available for viewing purposes only. The presence of source code
+in a public repository does not constitute a grant of any rights beyond
+those explicitly stated above.
